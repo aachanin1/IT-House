@@ -44,11 +44,18 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const editPassword = Deno.env.get("EDIT_PASSWORD") || "";
 const driveParentFolderId = Deno.env.get("GOOGLE_DRIVE_PARENT_FOLDER_ID") || "";
+const googleOAuthClientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID") || "";
+const googleOAuthClientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET") || "";
+const googleOAuthRefreshToken = Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN") || "";
 const googleServiceAccountEmail = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_EMAIL") || "";
 const googleServiceAccountPrivateKey = (Deno.env.get("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY") || "").replace(/\\n/g, "\n");
 const lineChannelAccessToken = Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN") || "";
 const lineTargetId = Deno.env.get("LINE_TARGET_ID") || "";
 const frontendUrl = Deno.env.get("FRONTEND_PUBLIC_URL") || "";
+
+function withDriveQuery(path: string) {
+  return path.includes("?") ? `${path}&supportsAllDrives=true` : `${path}?supportsAllDrives=true`;
+}
 
 function corsHeaders() {
   return {
@@ -163,8 +170,29 @@ function extractDriveId(value: string) {
 }
 
 async function getGoogleAccessToken() {
+  if (googleOAuthClientId && googleOAuthClientSecret && googleOAuthRefreshToken) {
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: googleOAuthClientId,
+        client_secret: googleOAuthClientSecret,
+        refresh_token: googleOAuthRefreshToken,
+        grant_type: "refresh_token",
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Google OAuth refresh token failed: ${text}`);
+    }
+
+    const json = await response.json();
+    return json.access_token as string;
+  }
+
   if (!googleServiceAccountEmail || !googleServiceAccountPrivateKey) {
-    throw new Error("Google service account environment variables are missing");
+    throw new Error("Google Drive credentials are missing");
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -210,14 +238,37 @@ async function driveRequest(path: string, init: RequestInit = {}, isUpload = fal
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Google Drive request failed: ${text}`);
+    try {
+      const parsed = JSON.parse(text);
+      const message = parsed?.error?.message || "";
+      const reason = parsed?.error?.errors?.[0]?.reason || "";
+
+      if (reason === "insufficientParentPermissions") {
+        throw new Error(`Google Drive ไม่มีสิทธิ์เข้าถึงโฟลเดอร์ปลายทาง กรุณาแชร์โฟลเดอร์ ${driveParentFolderId} ให้ ${googleServiceAccountEmail} เป็น Editor หรือ Content manager ก่อน`);
+      }
+
+      if (reason === "notFound") {
+        throw new Error(`ไม่พบโฟลเดอร์ Google Drive ปลายทาง (${driveParentFolderId}) หรือ service account ไม่มีสิทธิ์เข้าถึง`);
+      }
+
+      if (message.includes("Service Accounts do not have storage quota")) {
+        throw new Error("Service Account ไม่สามารถอัปโหลดเข้า My Drive ปกติได้ เพราะไม่มี storage quota กรุณาใช้ Shared Drive แล้วเพิ่ม service account เป็นสมาชิก หรือเปลี่ยน backend ไปใช้ OAuth ของบัญชี Google เจ้าของ Drive แทน");
+      }
+
+      throw new Error(`Google Drive request failed: ${message || text}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Google Drive request failed: ${text}`);
+    }
   }
 
   return response;
 }
 
 async function createFolder(name: string, parentId: string) {
-  const response = await driveRequest("/files?fields=id,name,webViewLink", {
+  const response = await driveRequest(withDriveQuery("/files?fields=id,name,webViewLink"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -230,7 +281,7 @@ async function createFolder(name: string, parentId: string) {
 }
 
 async function updateFolderName(folderId: string, name: string) {
-  const response = await driveRequest(`/files/${folderId}?fields=id,name,webViewLink`, {
+  const response = await driveRequest(withDriveQuery(`/files/${folderId}?fields=id,name,webViewLink`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -239,14 +290,14 @@ async function updateFolderName(folderId: string, name: string) {
 }
 
 async function getDriveFile(fileId: string) {
-  const response = await driveRequest(`/files/${fileId}?fields=id,name,webViewLink`, {
+  const response = await driveRequest(withDriveQuery(`/files/${fileId}?fields=id,name,webViewLink`), {
     method: "GET",
   });
   return await response.json();
 }
 
 async function deleteDriveFile(fileId: string) {
-  await driveRequest(`/files/${fileId}`, {
+  await driveRequest(withDriveQuery(`/files/${fileId}`), {
     method: "DELETE",
   });
 }
@@ -277,14 +328,14 @@ async function uploadFileToDrive(folderId: string, file: File, fileName: string)
     encoder.encode(`\r\n--${boundary}--`),
   ]);
 
-  const response = await driveRequest("/files?uploadType=multipart&fields=id,name,webViewLink", {
+  const response = await driveRequest(withDriveQuery("/files?uploadType=multipart&fields=id,name,webViewLink"), {
     method: "POST",
     headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
     body,
   }, true);
   const uploaded = await response.json();
 
-  await driveRequest(`/files/${uploaded.id}/permissions`, {
+  await driveRequest(withDriveQuery(`/files/${uploaded.id}/permissions`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role: "reader", type: "anyone" }),
