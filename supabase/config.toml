@@ -1,0 +1,4 @@
+project_id = "ckfocnezefqvfmdyoqce"
+
+[functions.records]
+verify_jwt = false
