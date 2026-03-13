@@ -1,0 +1,6 @@
+supabase/.env
+.env
+.env.*
+!.env.example
+supabase/.env.example
+supabase/*.json

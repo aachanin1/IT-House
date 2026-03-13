@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Warehouse Computer Specs</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; }
+    /* Minimal Card Styles */
+    .stat-card {
+        border: none;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        background: white;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .icon-circle {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+    .card-img-top { height: 200px; object-fit: cover; }
+    
+    /* Loading Overlay & Progress Bar */
+    .loading-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255,255,255,0.95); z-index: 9999;
+      display: none; justify-content: center; align-items: center; flex-direction: column;
+    }
+    .progress-container {
+        width: 80%;
+        max-width: 400px;
+        margin-top: 20px;
+    }
+    
+    .preview-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .preview-item {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .preview-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .btn-remove-img {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .btn-remove-img:hover { background: #dc3545; }
+    
+    .status-check { cursor: pointer; }
+    .form-check-input:disabled { opacity: 0.6; cursor: not-allowed; }
+    .form-check-input:checked:disabled { background-color: #198754; border-color: #198754; }
+    
+    .table-hover tbody tr:hover { background-color: #fff; transform: scale(1.005); transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+    .table thead th { border-bottom: none; color: #6c757d; font-weight: 600; font-size: 0.9rem; }
+    .table td { vertical-align: middle; }
+
+    .pagination .page-link {
+        border-radius: 50%;
+        margin: 0 3px;
+        border: none;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #555;
+    }
+    .pagination .page-item.active .page-link {
+        background-color: #0d6efd;
+        color: white;
+    }
+    .pagination .page-link:hover {
+        background-color: #e9ecef;
+        color: #0d6efd;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading & Progress -->
+  <div id="loading" class="loading-overlay">
+    <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+    <h5 class="fw-bold text-primary" id="loadingText">กำลังประมวลผล...</h5>
+    
+    <!-- New Progress Bar -->
+    <div class="progress-container" id="progressArea" style="display:none;">
+        <div class="progress" style="height: 20px;">
+            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%"></div>
+        </div>
+        <div class="text-center mt-2 text-muted small" id="progressDetail">กำลังเตรียมอัพโหลด...</div>
+    </div>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top mb-4">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand fw-bold text-primary" href="#"><i class="fas fa-server me-2"></i>IT Warehouse</a>
+      <button class="btn btn-primary btn-sm fw-bold rounded-pill px-3" onclick="openAddModal()">
+        <i class="fas fa-plus me-1"></i> เพิ่มข้อมูล
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content (Dashboard, Search, Table) -->
+  <div class="container-fluid px-4">
+    <div class="row g-3 mb-4">
+      <!-- ... (Dashboard Cards เหมือนเดิม) ... -->
+      <div class="col-6 col-md-4 col-lg"><div class="stat-card shadow-sm p-3 h-100"><div class="d-flex align-items-center"><div class="icon-circle bg-info bg-opacity-10 text-info me-3"><i class="fas fa-desktop"></i></div><div><p class="text-muted mb-0 small">PC</p><h4 class="fw-bold mb-0" id="countPC">0</h4></div></div></div></div>
+      <div class="col-6 col-md-4 col-lg"><div class="stat-card shadow-sm p-3 h-100"><div class="d-flex align-items-center"><div class="icon-circle bg-success bg-opacity-10 text-success me-3"><i class="fas fa-laptop"></i></div><div><p class="text-muted mb-0 small">Notebook</p><h4 class="fw-bold mb-0" id="countNB">0</h4></div></div></div></div>
+      <div class="col-6 col-md-4 col-lg"><div class="stat-card shadow-sm p-3 h-100"><div class="d-flex align-items-center"><div class="icon-circle bg-warning bg-opacity-10 text-warning me-3"><i class="fas fa-tv"></i></div><div><p class="text-muted mb-0 small">All in One</p><h4 class="fw-bold mb-0" id="countAIO">0</h4></div></div></div></div>
+      <div class="col-6 col-md-6 col-lg"><div class="stat-card shadow-sm p-3 h-100 border-start border-4 border-primary"><div class="d-flex align-items-center justify-content-between"><div><p class="text-primary mb-0 small fw-bold">ทำรูปแล้ว</p><h4 class="fw-bold mb-0 text-primary" id="countImgDone">0</h4></div><div class="icon-circle bg-primary bg-opacity-10 text-primary"><i class="fas fa-check"></i></div></div></div></div>
+      <div class="col-12 col-md-6 col-lg"><div class="stat-card shadow-sm p-3 h-100 border-start border-4 border-dark"><div class="d-flex align-items-center justify-content-between"><div><p class="text-dark mb-0 small fw-bold">โพสต์แล้ว</p><h4 class="fw-bold mb-0 text-dark" id="countPosted">0</h4></div><div class="icon-circle bg-dark bg-opacity-10 text-dark"><i class="fas fa-bullhorn"></i></div></div></div></div>
+    </div>
+
+    <!-- Search & Filter -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+      <div class="card-body p-2">
+        <div class="row g-2 align-items-center">
+          <div class="col-md-9"><div class="input-group"><span class="input-group-text bg-transparent border-0 ps-3"><i class="fas fa-search text-muted"></i></span><input type="text" id="searchInput" class="form-control border-0 shadow-none" placeholder="ค้นหา (ยี่ห้อ, รุ่น, CPU...)" style="background: transparent;"></div></div>
+          <div class="col-md-3"><select id="filterType" class="form-select border-0 bg-light rounded-pill px-3" style="cursor: pointer;"><option value="All">📦 ทุกประเภท</option><option value="PC">🖥️ PC</option><option value="Notebook">💻 Notebook</option><option value="All in One">📺 All in One</option></select></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
+              <tr>
+                <th class="ps-4 py-3">รูปภาพ</th>
+                <th style="min-width: 140px;">สถานะงาน</th>
+                <th>ประเภท</th>
+                <th>ยี่ห้อ / รุ่น</th>
+                <th>สเปคหลัก</th>
+                <th>ราคา</th>
+                <th class="text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="dataTableBody" class="bg-white"></tbody>
+          </table>
+        </div>
+        <div id="noDataMessage" class="text-center p-5 text-muted" style="display:none;"><i class="fas fa-inbox fa-3x mb-3 text-light"></i><br>ไม่พบข้อมูล</div>
+        <div id="paginationContainer" class="p-3 border-top d-flex justify-content-center"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div class="modal fade" id="formModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold text-primary" id="modalTitle">เพิ่มข้อมูล</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body pt-3">
+          <form id="dataForm">
+            <input type="hidden" id="recId">
+            <input type="hidden" id="currentFolderLink">
+            <input type="hidden" id="currentDate">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label small text-muted">ประเภท <span class="text-danger">*</span></label>
+                <select class="form-select rounded-3" id="type" required>
+                  <option value="" selected disabled>เลือกประเภท</option>
+                  <option value="PC">PC</option>
+                  <option value="Notebook">Notebook</option>
+                  <option value="All in One">All in One</option>
+                  <option value="Monitor">Monitor</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small text-muted">ยี่ห้อ <span class="text-danger">*</span></label>
+                <select class="form-select rounded-3" id="brand" required>
+                  <option value="" selected disabled>เลือกยี่ห้อ</option>
+                  <option value="Dell">Dell</option>
+                  <option value="HP">HP</option>
+                  <option value="Lenovo">Lenovo</option>
+                  <option value="Acer">Acer</option>
+                  <option value="Asus">Asus</option>
+                  <option value="Toshiba">Toshiba</option>
+                  <option value="Fujitsu">Fujitsu</option>
+                  <option value="MSI">MSI</option>
+                  <option value="Hisense">Hisense</option>
+                </select>
+              </div>
+              <div class="col-md-4"><label class="form-label small text-muted">รุ่น <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="model" required></div>
+              <div class="col-md-4"><label class="form-label small text-muted">CPU <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="cpu" required></div>
+              <div class="col-md-4"><label class="form-label small text-muted">RAM <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="ram" required></div>
+              <div class="col-md-4"><label class="form-label small text-muted">Storage <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="storage" required></div>
+              <div class="col-md-6"><label class="form-label small text-muted">Display / Size <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="display" required></div>
+              <div class="col-md-6"><label class="form-label small text-muted">ราคา <span class="text-danger">*</span></label><input type="number" class="form-control rounded-3" id="price" required></div>
+              <div class="col-12">
+                <label class="form-label small text-muted fw-bold">คุณสมบัติเพิ่มเติม</label>
+                <div class="card p-3 bg-light border-0">
+                    <div class="row g-2">
+                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="License Windows" id="feat_win"><label class="form-check-label small" for="feat_win">License Windows</label></div></div>
+                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="KB มีไฟ" id="feat_kb"><label class="form-check-label small" for="feat_kb">KB มีไฟ</label></div></div>
+                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="สแกนนิ้ว" id="feat_finger"><label class="form-check-label small" for="feat_finger">สแกนนิ้ว</label></div></div>
+                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="สแกนหน้า" id="feat_face"><label class="form-check-label small" for="feat_face">สแกนหน้า</label></div></div>
+                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="Card Wi-Fi" id="feat_wifi"><label class="form-check-label small" for="feat_wifi">Card Wi-Fi</label></div></div>
+                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="DVD-RW" id="feat_dvd"><label class="form-check-label small" for="feat_dvd">DVD-RW</label></div></div>
+                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="ใส่ Sim ได้" id="feat_sim"><label class="form-check-label small" for="feat_sim">ใส่ Sim ได้</label></div></div>
+                    </div>
+                </div>
+              </div>
+              <div class="col-12"><label class="form-label small text-muted">หมายเหตุ</label><input type="text" class="form-control rounded-3" id="remarks"></div>
+              <div class="col-12 bg-light p-3 rounded-3 border border-dashed">
+                <label class="form-label fw-bold small text-muted"><i class="fas fa-images me-1"></i> รูปภาพสินค้า</label>
+                <input type="file" class="form-control mb-2" id="fileInput" multiple accept="image/*">
+                <div id="imagePreviewContainer" class="preview-container"></div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" id="btnSubmit" class="btn btn-primary rounded-pill px-4" onclick="submitData()">บันทึก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold" id="viewBrandModel">รายละเอียด</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <div id="viewImagesCarousel" class="carousel slide bg-light rounded-3 overflow-hidden shadow-sm" data-bs-ride="carousel" style="min-height: 300px;">
+                <div class="carousel-inner" id="carouselInner"></div>
+                <button class="carousel-control-prev" type="button" data-bs-target="#viewImagesCarousel" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button>
+                <button class="carousel-control-next" type="button" data-bs-target="#viewImagesCarousel" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
+              </div>
+              <div class="text-center mt-3"><a href="#" id="viewDriveLink" target="_blank" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="fab fa-google-drive me-1"></i> ดูรูปทั้งหมดใน Drive</a></div>
+            </div>
+            <div class="col-md-6">
+              <ul class="list-group list-group-flush small">
+                <li class="list-group-item d-flex justify-content-between px-0"><span class="text-muted">วันที่รับเข้า</span><span id="viewDate" class="fw-bold text-dark"></span></li>
+                <li class="list-group-item d-flex justify-content-between px-0"><span class="text-muted">ประเภท</span><span id="viewType" class="fw-bold text-dark"></span></li>
+                <li class="list-group-item px-0"><span class="text-muted d-block">สเปค (CPU/RAM/Storage)</span><span class="fw-bold text-dark"><span id="viewCPU"></span> / <span id="viewRAM"></span> / <span id="viewStorage"></span></span></li>
+                <li class="list-group-item px-0"><span class="text-muted d-block">หน้าจอ</span><span id="viewDisplay" class="fw-bold text-dark"></span></li>
+                <li class="list-group-item px-0"><span class="text-muted d-block">ราคา</span><span id="viewPrice" class="text-success h4 fw-bold"></span></li>
+                <li class="list-group-item px-0"><span class="text-muted d-block">คุณสมบัติ</span><span id="viewFeatures"></span></li>
+                <li class="list-group-item px-0"><span class="text-muted d-block">หมายเหตุ</span><span id="viewRemarks" class="text-danger"></span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="app-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
