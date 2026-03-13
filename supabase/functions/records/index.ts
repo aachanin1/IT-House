@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { SignJWT, importPKCS8 } from "npm:jose@5.9.6";
 
 type RecordRow = {
   id: string;
@@ -47,8 +46,6 @@ const driveParentFolderId = Deno.env.get("GOOGLE_DRIVE_PARENT_FOLDER_ID") || "";
 const googleOAuthClientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID") || "";
 const googleOAuthClientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET") || "";
 const googleOAuthRefreshToken = Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN") || "";
-const googleServiceAccountEmail = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_EMAIL") || "";
-const googleServiceAccountPrivateKey = (Deno.env.get("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY") || "").replace(/\\n/g, "\n");
 const lineChannelAccessToken = Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN") || "";
 const lineTargetId = Deno.env.get("LINE_TARGET_ID") || "";
 const frontendUrl = Deno.env.get("FRONTEND_PUBLIC_URL") || "";
@@ -170,55 +167,24 @@ function extractDriveId(value: string) {
 }
 
 async function getGoogleAccessToken() {
-  if (googleOAuthClientId && googleOAuthClientSecret && googleOAuthRefreshToken) {
-    const response = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: googleOAuthClientId,
-        client_secret: googleOAuthClientSecret,
-        refresh_token: googleOAuthRefreshToken,
-        grant_type: "refresh_token",
-      }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Google OAuth refresh token failed: ${text}`);
-    }
-
-    const json = await response.json();
-    return json.access_token as string;
+  if (!googleOAuthClientId || !googleOAuthClientSecret || !googleOAuthRefreshToken) {
+    throw new Error("Google OAuth environment variables are missing");
   }
-
-  if (!googleServiceAccountEmail || !googleServiceAccountPrivateKey) {
-    throw new Error("Google Drive credentials are missing");
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  const privateKey = await importPKCS8(googleServiceAccountPrivateKey, "RS256");
-  const jwt = await new SignJWT({
-    iss: googleServiceAccountEmail,
-    scope: "https://www.googleapis.com/auth/drive",
-    aud: "https://oauth2.googleapis.com/token",
-  })
-    .setProtectedHeader({ alg: "RS256", typ: "JWT" })
-    .setIssuedAt(now)
-    .setExpirationTime(now + 3600)
-    .sign(privateKey);
 
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: jwt,
+      client_id: googleOAuthClientId,
+      client_secret: googleOAuthClientSecret,
+      refresh_token: googleOAuthRefreshToken,
+      grant_type: "refresh_token",
     }),
   });
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Google OAuth failed: ${text}`);
+    throw new Error(`Google OAuth refresh token failed: ${text}`);
   }
 
   const json = await response.json();
@@ -244,15 +210,11 @@ async function driveRequest(path: string, init: RequestInit = {}, isUpload = fal
       const reason = parsed?.error?.errors?.[0]?.reason || "";
 
       if (reason === "insufficientParentPermissions") {
-        throw new Error(`Google Drive ไม่มีสิทธิ์เข้าถึงโฟลเดอร์ปลายทาง กรุณาแชร์โฟลเดอร์ ${driveParentFolderId} ให้ ${googleServiceAccountEmail} เป็น Editor หรือ Content manager ก่อน`);
+        throw new Error(`Google Drive ไม่มีสิทธิ์เข้าถึงโฟลเดอร์ปลายทาง (${driveParentFolderId}) ของบัญชี Google ที่เชื่อมไว้ กรุณาตรวจว่าโฟลเดอร์นี้อยู่ใน Google Drive บัญชีเดียวกับที่ออก OAuth refresh token`);
       }
 
       if (reason === "notFound") {
-        throw new Error(`ไม่พบโฟลเดอร์ Google Drive ปลายทาง (${driveParentFolderId}) หรือ service account ไม่มีสิทธิ์เข้าถึง`);
-      }
-
-      if (message.includes("Service Accounts do not have storage quota")) {
-        throw new Error("Service Account ไม่สามารถอัปโหลดเข้า My Drive ปกติได้ เพราะไม่มี storage quota กรุณาใช้ Shared Drive แล้วเพิ่ม service account เป็นสมาชิก หรือเปลี่ยน backend ไปใช้ OAuth ของบัญชี Google เจ้าของ Drive แทน");
+        throw new Error(`ไม่พบโฟลเดอร์ Google Drive ปลายทาง (${driveParentFolderId}) หรือบัญชี Google ที่เชื่อมไว้ไม่มีสิทธิ์เข้าถึง`);
       }
 
       throw new Error(`Google Drive request failed: ${message || text}`);

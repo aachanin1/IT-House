@@ -3,5 +3,5 @@ supabase/.temp/
 .env
 .env.*
 !.env.example
-supabase/.env.example
+!supabase/.env.example
 supabase/*.json
