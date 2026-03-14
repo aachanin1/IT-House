@@ -17,6 +17,8 @@ let submissionInProgress = false;
 
 function createDefaultRuntimeSettings() {
   return {
+    editPassword: "",
+    adminPassword: "",
     googleDriveParentFolderId: "",
     lineNotifyEnabled: true,
     activeLineTargetPresetId: null,
@@ -25,6 +27,9 @@ function createDefaultRuntimeSettings() {
     lineMessageIncludeFrontendUrl: true,
     defaultType: "",
     defaultBrand: "",
+    typeOptions: ["PC", "Notebook", "All in One", "Monitor"],
+    brandOptions: ["Dell", "HP", "Lenovo", "Acer", "Asus", "Toshiba", "Fujitsu", "MSI", "Hisense"],
+    featureOptions: ["License Windows", "KB มีไฟ", "สแกนนิ้ว", "สแกนหน้า", "Card Wi-Fi", "DVD-RW", "ใส่ Sim ได้"],
     featureBulkStatusEnabled: true,
     featureSubmitLockEnabled: true,
     featureDedupeEnabled: true,
@@ -105,6 +110,62 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function parseAdminListInput(value) {
+  return String(value || "")
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item, index, array) => array.indexOf(item) === index);
+}
+
+function renderSelectOptions(selectId, options, placeholder, selectedValue = "", includeAllOption = false, allLabel = "ทั้งหมด") {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const normalizedOptions = Array.isArray(options) ? options.filter(Boolean) : [];
+  const baseOptions = includeAllOption
+    ? [`<option value="All">${escapeHtml(allLabel)}</option>`]
+    : [`<option value="" ${selectedValue ? "" : "selected"} disabled>${escapeHtml(placeholder)}</option>`];
+
+  select.innerHTML = `${baseOptions.join("")}${normalizedOptions.map((option) => (
+    `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`
+  )).join("")}`;
+
+  if (selectedValue && normalizedOptions.includes(selectedValue)) {
+    select.value = selectedValue;
+  } else if (includeAllOption) {
+    select.value = "All";
+  }
+}
+
+function renderFeatureCheckboxes(selectedValues = []) {
+  const container = document.getElementById("featureCheckboxList");
+  if (!container) return;
+  const selectedSet = new Set(selectedValues);
+  container.innerHTML = "";
+
+  runtimeSettings.featureOptions.forEach((feature, index) => {
+    const id = `feature_option_${index}`;
+    const col = document.createElement("div");
+    col.className = "col-6 col-md-4";
+    col.innerHTML = `
+      <div class="form-check">
+        <input class="form-check-input feature-check" type="checkbox" value="${escapeHtml(feature)}" id="${id}" ${selectedSet.has(feature) ? "checked" : ""}>
+        <label class="form-check-label small" for="${id}">${escapeHtml(feature)}</label>
+      </div>
+    `;
+    container.appendChild(col);
+  });
+}
+
+function renderRuntimeOptionControls() {
+  renderSelectOptions("type", runtimeSettings.typeOptions, "เลือกประเภท");
+  renderSelectOptions("brand", runtimeSettings.brandOptions, "เลือกยี่ห้อ");
+  renderSelectOptions("filterType", runtimeSettings.typeOptions, "ทุกประเภท", document.getElementById("filterType")?.value || "All", true, "ทุกประเภท");
+  renderSelectOptions("settingsDefaultType", runtimeSettings.typeOptions, "ไม่กำหนด", adminSettingsState?.defaultType || "");
+  renderSelectOptions("settingsDefaultBrand", runtimeSettings.brandOptions, "ไม่กำหนด", adminSettingsState?.defaultBrand || "");
+  renderFeatureCheckboxes(Array.from(document.querySelectorAll(".feature-check:checked")).map((cb) => cb.value));
+}
+
 function setLoadingState(isVisible, text = "กำลังประมวลผล...", showProgress = false) {
   document.getElementById("loading").style.display = isVisible ? "flex" : "none";
   document.getElementById("loadingText").innerText = text;
@@ -180,6 +241,7 @@ async function loadRuntimeSettings() {
 }
 
 function applyRuntimeSettingsToUi() {
+  renderRuntimeOptionControls();
   updatePendingStatusUi();
 }
 
@@ -360,7 +422,9 @@ function getResolvedStatus(item) {
 
 function renderPage() {
   const tbody = document.getElementById("dataTableBody");
+  const mobileList = document.getElementById("mobileRecordList");
   tbody.innerHTML = "";
+  mobileList.innerHTML = "";
 
   if (!currentDataList || currentDataList.length === 0) {
     document.getElementById("noDataMessage").style.display = "block";
@@ -376,11 +440,12 @@ function renderPage() {
 
   paginatedItems.forEach((item) => {
     const resolved = getResolvedStatus(item);
-    let imgHtml = `<img src="${placeholderImg}" class="rounded-3 border" style="width:50px;height:50px;object-fit:cover;">`;
+    let imageSrc = placeholderImg;
     if (item.imageLinks && item.imageLinks.length > 5) {
       const firstImg = item.imageLinks.split(",")[0];
-      imgHtml = `<img src="${escapeHtml(firstImg)}" class="rounded-3 border" style="width:50px;height:50px;object-fit:cover;" onerror="this.src='${placeholderImg}'">`;
+      imageSrc = firstImg;
     }
+    const imgHtml = `<img src="${escapeHtml(imageSrc)}" class="rounded-3 border" style="width:50px;height:50px;object-fit:cover;" onerror="this.src='${placeholderImg}'">`;
 
     const tr = document.createElement("tr");
     tr.id = `row_${item.id}`;
@@ -412,6 +477,53 @@ function renderPage() {
       <td class="text-center"><button class="btn btn-sm btn-light text-primary border rounded-circle" style="width:32px;height:32px;" onclick="viewDetails('${escapeHtml(item.id)}')"><i class="fas fa-eye"></i></button><button class="btn btn-sm btn-light text-warning border rounded-circle ms-1" style="width:32px;height:32px;" onclick="editData('${escapeHtml(item.id)}')"><i class="fas fa-pen"></i></button></td>
     `;
     tbody.appendChild(tr);
+
+    const mobileCard = document.createElement("div");
+    mobileCard.className = `record-mobile-card${resolved.isDirty ? " row-dirty" : ""}`;
+    mobileCard.innerHTML = `
+      <div class="record-mobile-top">
+        <img src="${escapeHtml(imageSrc)}" class="record-mobile-thumb" onerror="this.src='${placeholderImg}'">
+        <div class="flex-grow-1">
+          <div class="record-mobile-title">${escapeHtml(item.brand)} ${escapeHtml(item.model)}</div>
+          <div class="record-mobile-subtitle">${escapeHtml(item.type)} · ${escapeHtml(item.date || "-")}</div>
+          <div class="record-mobile-badges">
+            <span class="badge bg-light text-dark border">${escapeHtml(item.type)}</span>
+            <span class="badge ${resolved.statusImage ? "bg-primary-subtle text-primary" : "bg-secondary-subtle text-secondary"} border">${resolved.statusImage ? "ทำรูปแล้ว" : "รอทำรูป"}</span>
+            <span class="badge ${resolved.statusPosted ? "bg-success-subtle text-success" : "bg-secondary-subtle text-secondary"} border">${resolved.statusPosted ? "โพสต์แล้ว" : "รอโพสต์"}</span>
+          </div>
+        </div>
+      </div>
+      <div class="record-mobile-spec">
+        <div><strong>CPU:</strong> ${escapeHtml(item.cpu || "-")}</div>
+        <div><strong>RAM:</strong> ${escapeHtml(item.ram || "-")}</div>
+        <div><strong>Storage:</strong> ${escapeHtml(item.storage || "-")}</div>
+        <div><strong>Display:</strong> ${escapeHtml(item.display || "-")}</div>
+      </div>
+      <div class="record-mobile-price">
+        <span class="text-muted">ราคา</span>
+        <span class="record-mobile-price-value">${Number(item.price).toLocaleString()} บาท</span>
+      </div>
+      <div class="record-mobile-status">
+        <div class="d-flex flex-column gap-2">
+          <div class="form-check mb-0">
+            <input class="form-check-input status-check" type="checkbox" id="mobile_chk_img_${escapeHtml(item.id)}" ${resolved.statusImage ? "checked" : ""} ${item.statusImage ? "disabled" : ""} onchange="syncStatusToggle('${escapeHtml(item.id)}','image', this.checked)">
+            <label class="form-check-label small text-muted" for="mobile_chk_img_${escapeHtml(item.id)}">ทำรูปแล้ว</label>
+          </div>
+          <div class="form-check mb-0">
+            <input class="form-check-input status-check" type="checkbox" id="mobile_chk_post_${escapeHtml(item.id)}" ${resolved.statusPosted ? "checked" : ""} ${item.statusPosted ? "disabled" : ""} onchange="syncStatusToggle('${escapeHtml(item.id)}','posted', this.checked)">
+            <label class="form-check-label small text-muted" for="mobile_chk_post_${escapeHtml(item.id)}">โพสต์แล้ว</label>
+          </div>
+          <button id="mobile_btn_save_status_${escapeHtml(item.id)}" class="btn btn-sm btn-success rounded-pill mt-2" style="display:${(!runtimeSettings.featureBulkStatusEnabled && resolved.isDirty) ? "block" : "none"};" onclick="saveStatus('${escapeHtml(item.id)}')" ${resolved.isDirty ? "" : "disabled"}>
+            <i class="fas fa-check me-1"></i> บันทึกสถานะ
+          </button>
+        </div>
+      </div>
+      <div class="record-mobile-actions">
+        <button class="btn btn-light border rounded-pill" onclick="viewDetails('${escapeHtml(item.id)}')"><i class="fas fa-eye me-1"></i> รายละเอียด</button>
+        <button class="btn btn-warning-subtle border rounded-pill" onclick="editData('${escapeHtml(item.id)}')"><i class="fas fa-pen me-1"></i> แก้ไข</button>
+      </div>
+    `;
+    mobileList.appendChild(mobileCard);
   });
 
   renderPaginationControls();
@@ -453,6 +565,14 @@ function getCheckboxState(id) {
   };
 }
 
+function syncStatusToggle(id, field, checked) {
+  const desktopTarget = document.getElementById(field === "image" ? `chk_img_${id}` : `chk_post_${id}`);
+  const mobileTarget = document.getElementById(field === "image" ? `mobile_chk_img_${id}` : `mobile_chk_post_${id}`);
+  if (desktopTarget) desktopTarget.checked = checked;
+  if (mobileTarget) mobileTarget.checked = checked;
+  toggleSaveBtn(id);
+}
+
 function toggleSaveBtn(id) {
   const item = globalData.find((row) => row.id === id);
   if (!item) return;
@@ -474,6 +594,11 @@ function toggleSaveBtn(id) {
   if (btn) {
     btn.disabled = !hasChanges;
     btn.style.display = (!runtimeSettings.featureBulkStatusEnabled && hasChanges) ? "block" : "none";
+  }
+  const mobileBtn = document.getElementById(`mobile_btn_save_status_${id}`);
+  if (mobileBtn) {
+    mobileBtn.disabled = !hasChanges;
+    mobileBtn.style.display = (!runtimeSettings.featureBulkStatusEnabled && hasChanges) ? "block" : "none";
   }
 
   updatePendingStatusUi();
@@ -643,9 +768,7 @@ function applyFormDefaults() {
 
 function resetFormState() {
   document.getElementById("dataForm").reset();
-  document.querySelectorAll(".feature-check").forEach((cb) => {
-    cb.checked = false;
-  });
+  renderFeatureCheckboxes([]);
   document.getElementById("recId").value = "";
   document.getElementById("currentDate").value = "";
   document.getElementById("currentFolderLink").value = "";
@@ -700,9 +823,7 @@ async function editData(id) {
     document.getElementById("remarks").value = item.remarks;
     document.getElementById("currentFolderLink").value = item.folderLink;
     document.getElementById("submissionNonce").value = crypto.randomUUID();
-    document.querySelectorAll(".feature-check").forEach((cb) => {
-      cb.checked = false;
-    });
+    renderFeatureCheckboxes([]);
     if (item.features) {
       item.features.split(", ").forEach((feature) => {
         const checkbox = document.querySelector(`.feature-check[value="${CSS.escape(feature)}"]`);
@@ -834,13 +955,19 @@ function renderLineTargetPresetRows() {
 
 function populateAdminSettingsForm() {
   if (!adminSettingsState) return;
+  renderRuntimeOptionControls();
   document.getElementById("settingsLineNotifyEnabled").checked = Boolean(adminSettingsState.lineNotifyEnabled);
   document.getElementById("settingsLineMessageHeader").value = adminSettingsState.lineMessageHeader || "";
   document.getElementById("settingsLineMessageSeparator").value = adminSettingsState.lineMessageSeparator || "";
   document.getElementById("settingsLineIncludeFrontendUrl").checked = Boolean(adminSettingsState.lineMessageIncludeFrontendUrl);
   document.getElementById("settingsDriveParentFolderId").value = adminSettingsState.googleDriveParentFolderId || "";
+  document.getElementById("settingsEditPassword").value = adminSettingsState.editPassword || "";
+  document.getElementById("settingsAdminPassword").value = adminSettingsState.adminPassword || "";
   document.getElementById("settingsDefaultType").value = adminSettingsState.defaultType || "";
   document.getElementById("settingsDefaultBrand").value = adminSettingsState.defaultBrand || "";
+  document.getElementById("settingsTypeOptions").value = (adminSettingsState.typeOptions || []).join("\n");
+  document.getElementById("settingsBrandOptions").value = (adminSettingsState.brandOptions || []).join("\n");
+  document.getElementById("settingsFeatureOptions").value = (adminSettingsState.featureOptions || []).join("\n");
   document.getElementById("settingsFeatureBulkStatusEnabled").checked = Boolean(adminSettingsState.featureBulkStatusEnabled);
   document.getElementById("settingsFeatureSubmitLockEnabled").checked = Boolean(adminSettingsState.featureSubmitLockEnabled);
   document.getElementById("settingsFeatureDedupeEnabled").checked = Boolean(adminSettingsState.featureDedupeEnabled);
@@ -914,6 +1041,8 @@ async function saveAdminSettings() {
   }
 
   syncLineTargetPresetStateFromDom();
+  adminSettingsState.editPassword = document.getElementById("settingsEditPassword").value.trim();
+  adminSettingsState.adminPassword = document.getElementById("settingsAdminPassword").value.trim();
   adminSettingsState.lineNotifyEnabled = document.getElementById("settingsLineNotifyEnabled").checked;
   adminSettingsState.lineMessageHeader = document.getElementById("settingsLineMessageHeader").value.trim();
   adminSettingsState.lineMessageSeparator = document.getElementById("settingsLineMessageSeparator").value.trim();
@@ -921,10 +1050,30 @@ async function saveAdminSettings() {
   adminSettingsState.googleDriveParentFolderId = document.getElementById("settingsDriveParentFolderId").value.trim();
   adminSettingsState.defaultType = document.getElementById("settingsDefaultType").value;
   adminSettingsState.defaultBrand = document.getElementById("settingsDefaultBrand").value.trim();
+  adminSettingsState.typeOptions = parseAdminListInput(document.getElementById("settingsTypeOptions").value);
+  adminSettingsState.brandOptions = parseAdminListInput(document.getElementById("settingsBrandOptions").value);
+  adminSettingsState.featureOptions = parseAdminListInput(document.getElementById("settingsFeatureOptions").value);
   adminSettingsState.featureBulkStatusEnabled = document.getElementById("settingsFeatureBulkStatusEnabled").checked;
   adminSettingsState.featureSubmitLockEnabled = document.getElementById("settingsFeatureSubmitLockEnabled").checked;
   adminSettingsState.featureDedupeEnabled = document.getElementById("settingsFeatureDedupeEnabled").checked;
   adminSettingsState.activeLineTargetPresetId = document.getElementById("settingsActiveLineTargetPresetId").value || null;
+
+  if (!adminSettingsState.editPassword || !adminSettingsState.adminPassword) {
+    Swal.fire("แจ้งเตือน", "กรุณากำหนดรหัสผ่าน Edit และ Admin ให้ครบ", "warning");
+    return;
+  }
+  if (adminSettingsState.typeOptions.length === 0 || adminSettingsState.brandOptions.length === 0 || adminSettingsState.featureOptions.length === 0) {
+    Swal.fire("แจ้งเตือน", "รายการประเภท ยี่ห้อ และคุณสมบัติเพิ่มเติม ต้องมีอย่างน้อย 1 รายการ", "warning");
+    return;
+  }
+  if (adminSettingsState.defaultType && !adminSettingsState.typeOptions.includes(adminSettingsState.defaultType)) {
+    Swal.fire("แจ้งเตือน", "ประเภทตั้งต้นต้องอยู่ในรายการประเภท", "warning");
+    return;
+  }
+  if (adminSettingsState.defaultBrand && !adminSettingsState.brandOptions.includes(adminSettingsState.defaultBrand)) {
+    Swal.fire("แจ้งเตือน", "ยี่ห้อตั้งต้นต้องอยู่ในรายการยี่ห้อ", "warning");
+    return;
+  }
 
   try {
     setLoadingState(true, "กำลังบันทึกการตั้งค่า...");
@@ -934,6 +1083,8 @@ async function saveAdminSettings() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         password: adminSettingsSessionPassword,
+        editPassword: adminSettingsState.editPassword,
+        adminPassword: adminSettingsState.adminPassword,
         googleDriveParentFolderId: adminSettingsState.googleDriveParentFolderId,
         lineNotifyEnabled: adminSettingsState.lineNotifyEnabled,
         activeLineTargetPresetId: adminSettingsState.activeLineTargetPresetId,
@@ -942,6 +1093,9 @@ async function saveAdminSettings() {
         lineMessageIncludeFrontendUrl: adminSettingsState.lineMessageIncludeFrontendUrl,
         defaultType: adminSettingsState.defaultType,
         defaultBrand: adminSettingsState.defaultBrand,
+        typeOptions: adminSettingsState.typeOptions,
+        brandOptions: adminSettingsState.brandOptions,
+        featureOptions: adminSettingsState.featureOptions,
         featureBulkStatusEnabled: adminSettingsState.featureBulkStatusEnabled,
         featureSubmitLockEnabled: adminSettingsState.featureSubmitLockEnabled,
         featureDedupeEnabled: adminSettingsState.featureDedupeEnabled,
@@ -952,6 +1106,8 @@ async function saveAdminSettings() {
     adminSettingsState = normalizeAdminSettingsData(response?.data);
     runtimeSettings = {
       ...runtimeSettings,
+      editPassword: adminSettingsState.editPassword,
+      adminPassword: adminSettingsState.adminPassword,
       googleDriveParentFolderId: adminSettingsState.googleDriveParentFolderId,
       lineNotifyEnabled: adminSettingsState.lineNotifyEnabled,
       activeLineTargetPresetId: adminSettingsState.activeLineTargetPresetId,
@@ -960,12 +1116,16 @@ async function saveAdminSettings() {
       lineMessageIncludeFrontendUrl: adminSettingsState.lineMessageIncludeFrontendUrl,
       defaultType: adminSettingsState.defaultType,
       defaultBrand: adminSettingsState.defaultBrand,
+      typeOptions: adminSettingsState.typeOptions,
+      brandOptions: adminSettingsState.brandOptions,
+      featureOptions: adminSettingsState.featureOptions,
       featureBulkStatusEnabled: adminSettingsState.featureBulkStatusEnabled,
       featureSubmitLockEnabled: adminSettingsState.featureSubmitLockEnabled,
       featureDedupeEnabled: adminSettingsState.featureDedupeEnabled,
       lineTargetPresetNames: adminSettingsState.lineTargetPresets.map((preset) => ({ id: preset.id, name: preset.name })),
       lineTargetPresets: adminSettingsState.lineTargetPresets,
     };
+    adminSettingsSessionPassword = adminSettingsState.adminPassword;
     applyRuntimeSettingsToUi();
     setLoadingState(false);
     adminSettingsModal.hide();
@@ -999,6 +1159,7 @@ window.openAddModal = openAddModal;
 window.submitData = submitData;
 window.changePage = changePage;
 window.toggleSaveBtn = toggleSaveBtn;
+window.syncStatusToggle = syncStatusToggle;
 window.saveStatus = saveStatus;
 window.saveAllStatusChanges = saveAllStatusChanges;
 window.clearPendingStatusChanges = clearPendingStatusChanges;

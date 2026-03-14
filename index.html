@@ -84,7 +84,7 @@
     .form-check-input:disabled { opacity: 0.6; cursor: not-allowed; }
     .form-check-input:checked:disabled { background-color: #198754; border-color: #198754; }
     
-    .table-hover tbody tr:hover { background-color: #fff; transform: scale(1.005); transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+    .table-hover tbody tr:hover { background-color: #fbfcfe; transition: background-color 0.2s ease, box-shadow 0.2s ease; box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.06); }
     .table thead th { border-bottom: none; color: #6c757d; font-weight: 600; font-size: 0.9rem; }
     .table td { vertical-align: middle; }
 
@@ -148,6 +148,95 @@
       color: #6c757d;
       margin-bottom: 0.35rem;
     }
+    .records-table-wrap {
+      display: block;
+    }
+    .records-mobile-list {
+      display: none;
+      padding: 0.9rem;
+      gap: 0.9rem;
+      background: #f8fafc;
+    }
+    .record-mobile-card {
+      border: 1px solid #edf1f5;
+      border-radius: 16px;
+      background: #fff;
+      padding: 0.95rem;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    }
+    .record-mobile-top {
+      display: flex;
+      gap: 0.85rem;
+      align-items: flex-start;
+    }
+    .record-mobile-thumb {
+      width: 64px;
+      height: 64px;
+      flex: 0 0 64px;
+      border-radius: 14px;
+      object-fit: cover;
+      border: 1px solid #e9ecef;
+      background: #fff;
+    }
+    .record-mobile-title {
+      font-size: 0.98rem;
+      font-weight: 600;
+      color: #1f2937;
+      line-height: 1.35;
+      margin-bottom: 0.2rem;
+    }
+    .record-mobile-subtitle {
+      font-size: 0.8rem;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+    .record-mobile-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-top: 0.75rem;
+    }
+    .record-mobile-spec,
+    .record-mobile-price,
+    .record-mobile-actions,
+    .record-mobile-status {
+      margin-top: 0.85rem;
+    }
+    .record-mobile-spec {
+      font-size: 0.84rem;
+      color: #4b5563;
+      background: #f8fafc;
+      border: 1px solid #eef2f7;
+      border-radius: 12px;
+      padding: 0.75rem;
+      line-height: 1.5;
+    }
+    .record-mobile-price {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      font-size: 0.9rem;
+    }
+    .record-mobile-price-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #198754;
+    }
+    .record-mobile-status {
+      border-top: 1px dashed #e5e7eb;
+      padding-top: 0.85rem;
+    }
+    .record-mobile-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.6rem;
+    }
+    .admin-option-textarea {
+      min-height: 150px;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
     @media (max-width: 991.98px) {
       .navbar .container-fluid {
         gap: 0.75rem;
@@ -159,21 +248,15 @@
         width: 100%;
         justify-content: flex-end;
       }
-    }
-    @media (max-width: 767.98px) {
-      .container-fluid.px-4 {
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-      }
-      .progress-container {
-        width: calc(100% - 2rem);
-      }
       .navbar-actions {
         width: 100%;
         justify-content: stretch;
       }
       .navbar-actions .btn {
         flex: 1 1 0;
+      }
+      .toolbar-card .card-body {
+        padding: 0.85rem;
       }
       .table-responsive {
         border-top: 1px solid #f1f3f5;
@@ -188,6 +271,16 @@
       .bulk-status-bar .btn-group,
       .bulk-status-bar .btn {
         width: 100%;
+      }
+      .records-table-wrap {
+        display: none;
+      }
+      .records-mobile-list {
+        display: flex;
+        flex-direction: column;
+      }
+      .card-body.p-0 #paginationContainer {
+        padding-top: 0.5rem !important;
       }
     }
   </style>
@@ -239,7 +332,7 @@
       <div class="card-body p-2">
         <div class="row g-2 align-items-center">
           <div class="col-12 col-lg-5"><div class="input-group"><span class="input-group-text bg-transparent border-0 ps-3"><i class="fas fa-search text-muted"></i></span><input type="text" id="searchInput" class="form-control border-0 shadow-none" placeholder="ค้นหา (ยี่ห้อ, รุ่น, CPU, RAM, หมายเหตุ...)" style="background: transparent;"></div></div>
-          <div class="col-6 col-lg-3"><select id="filterType" class="form-select border-0 bg-light rounded-pill px-3" style="cursor: pointer;"><option value="All">📦 ทุกประเภท</option><option value="PC">🖥️ PC</option><option value="Notebook">💻 Notebook</option><option value="All in One">📺 All in One</option><option value="Monitor">🖥️ Monitor</option></select></div>
+          <div class="col-6 col-lg-3"><select id="filterType" class="form-select border-0 bg-light rounded-pill px-3" style="cursor: pointer;"><option value="All"> ทุกประเภท</option></select></div>
           <div class="col-6 col-lg-2"><select id="filterStatus" class="form-select border-0 bg-light rounded-pill px-3" style="cursor: pointer;"><option value="All">สถานะทั้งหมด</option><option value="pending">ยังไม่ครบ</option><option value="image-done">ทำรูปแล้ว</option><option value="posted-done">โพสต์แล้ว</option><option value="fully-done">ครบทั้งคู่</option></select></div>
           <div class="col-12 col-lg-2 d-grid"><button type="button" class="btn btn-light border rounded-pill" onclick="resetFilters()"><i class="fas fa-rotate-left me-1"></i> ล้างตัวกรอง</button></div>
         </div>
@@ -259,22 +352,25 @@
             <button type="button" id="btnSaveAllStatuses" class="btn btn-success rounded-pill px-3" onclick="saveAllStatusChanges()"><i class="fas fa-check me-1"></i> บันทึกที่เลือกทั้งหมด</button>
           </div>
         </div>
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead class="bg-light">
-              <tr>
-                <th class="ps-4 py-3">รูปภาพ</th>
-                <th style="min-width: 140px;">สถานะงาน</th>
-                <th>ประเภท</th>
-                <th>ยี่ห้อ / รุ่น</th>
-                <th>สเปคหลัก</th>
-                <th>ราคา</th>
-                <th class="text-center">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody id="dataTableBody" class="bg-white"></tbody>
-          </table>
+        <div class="records-table-wrap">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="bg-light">
+                <tr>
+                  <th class="ps-4 py-3">รูปภาพ</th>
+                  <th style="min-width: 140px;">สถานะงาน</th>
+                  <th>ประเภท</th>
+                  <th>ยี่ห้อ / รุ่น</th>
+                  <th>สเปคหลัก</th>
+                  <th>ราคา</th>
+                  <th class="text-center">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="dataTableBody" class="bg-white"></tbody>
+            </table>
+          </div>
         </div>
+        <div id="mobileRecordList" class="records-mobile-list"></div>
         <div id="noDataMessage" class="text-center p-5 text-muted" style="display:none;"><i class="fas fa-inbox fa-3x mb-3 text-light"></i><br>ไม่พบข้อมูล</div>
         <div id="paginationContainer" class="p-3 border-top d-flex justify-content-center"></div>
       </div>
@@ -300,25 +396,12 @@
                 <label class="form-label small text-muted">ประเภท <span class="text-danger">*</span></label>
                 <select class="form-select rounded-3" id="type" required>
                   <option value="" selected disabled>เลือกประเภท</option>
-                  <option value="PC">PC</option>
-                  <option value="Notebook">Notebook</option>
-                  <option value="All in One">All in One</option>
-                  <option value="Monitor">Monitor</option>
                 </select>
               </div>
               <div class="col-md-4">
                 <label class="form-label small text-muted">ยี่ห้อ <span class="text-danger">*</span></label>
                 <select class="form-select rounded-3" id="brand" required>
                   <option value="" selected disabled>เลือกยี่ห้อ</option>
-                  <option value="Dell">Dell</option>
-                  <option value="HP">HP</option>
-                  <option value="Lenovo">Lenovo</option>
-                  <option value="Acer">Acer</option>
-                  <option value="Asus">Asus</option>
-                  <option value="Toshiba">Toshiba</option>
-                  <option value="Fujitsu">Fujitsu</option>
-                  <option value="MSI">MSI</option>
-                  <option value="Hisense">Hisense</option>
                 </select>
               </div>
               <div class="col-md-4"><label class="form-label small text-muted">รุ่น <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="model" required></div>
@@ -330,15 +413,7 @@
               <div class="col-12">
                 <label class="form-label small text-muted fw-bold">คุณสมบัติเพิ่มเติม</label>
                 <div class="card p-3 bg-light border-0">
-                    <div class="row g-2">
-                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="License Windows" id="feat_win"><label class="form-check-label small" for="feat_win">License Windows</label></div></div>
-                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="KB มีไฟ" id="feat_kb"><label class="form-check-label small" for="feat_kb">KB มีไฟ</label></div></div>
-                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="สแกนนิ้ว" id="feat_finger"><label class="form-check-label small" for="feat_finger">สแกนนิ้ว</label></div></div>
-                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="สแกนหน้า" id="feat_face"><label class="form-check-label small" for="feat_face">สแกนหน้า</label></div></div>
-                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="Card Wi-Fi" id="feat_wifi"><label class="form-check-label small" for="feat_wifi">Card Wi-Fi</label></div></div>
-                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="DVD-RW" id="feat_dvd"><label class="form-check-label small" for="feat_dvd">DVD-RW</label></div></div>
-                        <div class="col-6 col-md-4"><div class="form-check"><input class="form-check-input feature-check" type="checkbox" value="ใส่ Sim ได้" id="feat_sim"><label class="form-check-label small" for="feat_sim">ใส่ Sim ได้</label></div></div>
-                    </div>
+                    <div class="row g-2" id="featureCheckboxList"></div>
                 </div>
               </div>
               <div class="col-12"><label class="form-label small text-muted">หมายเหตุ</label><input type="text" class="form-control rounded-3" id="remarks"></div>
@@ -445,15 +520,13 @@
                       <label class="settings-grid-label">ประเภทตั้งต้น</label>
                       <select id="settingsDefaultType" class="form-select rounded-3">
                         <option value="">ไม่กำหนด</option>
-                        <option value="PC">PC</option>
-                        <option value="Notebook">Notebook</option>
-                        <option value="All in One">All in One</option>
-                        <option value="Monitor">Monitor</option>
                       </select>
                     </div>
                     <div class="col-md-6">
                       <label class="settings-grid-label">ยี่ห้อตั้งต้น</label>
-                      <input type="text" id="settingsDefaultBrand" class="form-control rounded-3">
+                      <select id="settingsDefaultBrand" class="form-select rounded-3">
+                        <option value="">ไม่กำหนด</option>
+                      </select>
                     </div>
                   </div>
                   <div class="row g-2">
@@ -479,6 +552,26 @@
                 </div>
               </div>
             </div>
+            <div class="col-12 col-lg-6">
+              <div class="card border-0 bg-light h-100">
+                <div class="card-body">
+                  <h6 class="fw-bold mb-3">Security Settings</h6>
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <label class="settings-grid-label">รหัสผ่านแก้ไขข้อมูล</label>
+                      <input type="password" id="settingsEditPassword" class="form-control rounded-3" placeholder="ตั้งรหัสผ่านสำหรับแก้ไขข้อมูลและบันทึกสถานะ">
+                    </div>
+                    <div class="col-12">
+                      <label class="settings-grid-label">รหัสผ่าน Admin Settings</label>
+                      <input type="password" id="settingsAdminPassword" class="form-control rounded-3" placeholder="ตั้งรหัสผ่านสำหรับหน้า Admin Settings">
+                    </div>
+                    <div class="col-12">
+                      <div class="small text-muted">บันทึกครั้งเดียวแล้วระบบจะใช้รหัสผ่านใหม่ทันที</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="col-12">
               <div class="card border-0 bg-light">
                 <div class="card-body">
@@ -490,6 +583,32 @@
                     <button type="button" class="btn btn-primary rounded-pill px-3" onclick="addLineTargetPresetRow()"><i class="fas fa-plus me-1"></i> เพิ่มปลายทาง</button>
                   </div>
                   <div id="lineTargetPresetList" class="d-flex flex-column gap-3"></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="card border-0 bg-light">
+                <div class="card-body">
+                  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <div>
+                      <h6 class="fw-bold mb-1">Form Option Settings</h6>
+                      <div class="small text-muted">เพิ่ม ลบ หรือแก้ไขประเภท ยี่ห้อ และ checkbox คุณสมบัติเพิ่มเติมได้จากหน้านี้ โดยใส่หนึ่งรายการต่อหนึ่งบรรทัด</div>
+                    </div>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-12 col-lg-4">
+                      <label class="settings-grid-label">ประเภท</label>
+                      <textarea id="settingsTypeOptions" class="form-control rounded-3 admin-option-textarea" placeholder="PC&#10;Notebook&#10;All in One"></textarea>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                      <label class="settings-grid-label">ยี่ห้อ</label>
+                      <textarea id="settingsBrandOptions" class="form-control rounded-3 admin-option-textarea" placeholder="Dell&#10;HP&#10;Lenovo"></textarea>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                      <label class="settings-grid-label">คุณสมบัติเพิ่มเติม</label>
+                      <textarea id="settingsFeatureOptions" class="form-control rounded-3 admin-option-textarea" placeholder="License Windows&#10;KB มีไฟ&#10;DVD-RW"></textarea>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -52,6 +52,8 @@ create table if not exists public.line_target_presets (
 
 create table if not exists public.app_settings (
   key text primary key default 'main' check (key = 'main'),
+  edit_password text not null default '',
+  admin_password text not null default '',
   google_drive_parent_folder_id text not null default '',
   line_notify_enabled boolean not null default true,
   active_line_target_preset_id uuid references public.line_target_presets(id) on delete set null,
@@ -60,6 +62,9 @@ create table if not exists public.app_settings (
   line_message_include_frontend_url boolean not null default true,
   default_type text not null default '',
   default_brand text not null default '',
+  type_options jsonb not null default '["PC","Notebook","All in One","Monitor"]'::jsonb,
+  brand_options jsonb not null default '["Dell","HP","Lenovo","Acer","Asus","Toshiba","Fujitsu","MSI","Hisense"]'::jsonb,
+  feature_options jsonb not null default '["License Windows","KB มีไฟ","สแกนนิ้ว","สแกนหน้า","Card Wi-Fi","DVD-RW","ใส่ Sim ได้"]'::jsonb,
   feature_bulk_status_enabled boolean not null default true,
   feature_submit_lock_enabled boolean not null default true,
   feature_dedupe_enabled boolean not null default true,

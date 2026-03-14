@@ -41,6 +41,8 @@ type RecordPayload = {
 
 type AppSettingsRow = {
   key: string;
+  edit_password: string;
+  admin_password: string;
   google_drive_parent_folder_id: string;
   line_notify_enabled: boolean;
   active_line_target_preset_id: string | null;
@@ -49,6 +51,9 @@ type AppSettingsRow = {
   line_message_include_frontend_url: boolean;
   default_type: string;
   default_brand: string;
+  type_options: unknown;
+  brand_options: unknown;
+  feature_options: unknown;
   feature_bulk_status_enabled: boolean;
   feature_submit_lock_enabled: boolean;
   feature_dedupe_enabled: boolean;
@@ -62,6 +67,8 @@ type LineTargetPresetRow = {
 };
 
 type RuntimeSettings = {
+  editPassword: string;
+  adminPassword: string;
   googleDriveParentFolderId: string;
   lineNotifyEnabled: boolean;
   activeLineTargetPresetId: string | null;
@@ -70,6 +77,9 @@ type RuntimeSettings = {
   lineMessageIncludeFrontendUrl: boolean;
   defaultType: string;
   defaultBrand: string;
+  typeOptions: string[];
+  brandOptions: string[];
+  featureOptions: string[];
   featureBulkStatusEnabled: boolean;
   featureSubmitLockEnabled: boolean;
   featureDedupeEnabled: boolean;
@@ -93,6 +103,9 @@ const googleOAuthRefreshToken = Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN") || ""
 const lineChannelAccessToken = Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN") || "";
 const lineTargetId = Deno.env.get("LINE_TARGET_ID") || "";
 const frontendUrl = Deno.env.get("FRONTEND_PUBLIC_URL") || "";
+const defaultTypeOptions = ["PC", "Notebook", "All in One", "Monitor"];
+const defaultBrandOptions = ["Dell", "HP", "Lenovo", "Acer", "Asus", "Toshiba", "Fujitsu", "MSI", "Hisense"];
+const defaultFeatureOptions = ["License Windows", "KB มีไฟ", "สแกนนิ้ว", "สแกนหน้า", "Card Wi-Fi", "DVD-RW", "ใส่ Sim ได้"];
 
 function withDriveQuery(path: string) {
   return path.includes("?") ? `${path}&supportsAllDrives=true` : `${path}?supportsAllDrives=true`;
@@ -180,16 +193,30 @@ function mapRow(row: RecordRow) {
   };
 }
 
-function validatePassword(password: string) {
-  return Boolean(editPassword) && password === editPassword;
+function matchesPassword(input: string, actual: string) {
+  return Boolean(actual) && input === actual;
 }
 
-function validateAdminPassword(password: string) {
-  return Boolean(adminSettingsPassword) && password === adminSettingsPassword;
+function normalizeStringArray(value: unknown, fallback: string[]) {
+  if (!Array.isArray(value)) {
+    return [...fallback];
+  }
+  const normalized = value
+    .map((item) => typeof item === "string" ? item.trim() : "")
+    .filter(Boolean);
+  return normalized.length > 0 ? Array.from(new Set(normalized)) : [...fallback];
 }
 
-function ensureAdminPasswordConfigured() {
-  if (!adminSettingsPassword) {
+function validatePassword(password: string, settings: RuntimeSettings) {
+  return matchesPassword(password, settings.editPassword || editPassword);
+}
+
+function validateAdminPassword(password: string, settings: RuntimeSettings) {
+  return matchesPassword(password, settings.adminPassword || adminSettingsPassword);
+}
+
+function ensureAdminPasswordConfigured(settings: RuntimeSettings) {
+  if (!(settings.adminPassword || adminSettingsPassword)) {
     throw new Error("ยังไม่ได้ตั้งค่า ADMIN_SETTINGS_PASSWORD สำหรับหน้า Admin Settings");
   }
 }
@@ -320,6 +347,8 @@ async function deleteDriveFile(fileId: string) {
 
 function mapRuntimeSettings(settingsRow: AppSettingsRow, presets: LineTargetPresetRow[]): RuntimeSettings {
   return {
+    editPassword: settingsRow.edit_password || editPassword,
+    adminPassword: settingsRow.admin_password || adminSettingsPassword,
     googleDriveParentFolderId: settingsRow.google_drive_parent_folder_id || driveParentFolderId,
     lineNotifyEnabled: Boolean(settingsRow.line_notify_enabled),
     activeLineTargetPresetId: settingsRow.active_line_target_preset_id || null,
@@ -328,6 +357,9 @@ function mapRuntimeSettings(settingsRow: AppSettingsRow, presets: LineTargetPres
     lineMessageIncludeFrontendUrl: Boolean(settingsRow.line_message_include_frontend_url),
     defaultType: settingsRow.default_type || "",
     defaultBrand: settingsRow.default_brand || "",
+    typeOptions: normalizeStringArray(settingsRow.type_options, defaultTypeOptions),
+    brandOptions: normalizeStringArray(settingsRow.brand_options, defaultBrandOptions),
+    featureOptions: normalizeStringArray(settingsRow.feature_options, defaultFeatureOptions),
     featureBulkStatusEnabled: Boolean(settingsRow.feature_bulk_status_enabled),
     featureSubmitLockEnabled: Boolean(settingsRow.feature_submit_lock_enabled),
     featureDedupeEnabled: Boolean(settingsRow.feature_dedupe_enabled),
@@ -372,7 +404,7 @@ async function ensureDefaultRuntimeSettings(supabase: ReturnType<typeof getSupab
 
   const { data: settingsRow, error: settingsError } = await supabase
     .from("app_settings")
-    .select("key, google_drive_parent_folder_id, line_notify_enabled, active_line_target_preset_id, line_message_header, line_message_separator, line_message_include_frontend_url, default_type, default_brand, feature_bulk_status_enabled, feature_submit_lock_enabled, feature_dedupe_enabled")
+    .select("key, edit_password, admin_password, google_drive_parent_folder_id, line_notify_enabled, active_line_target_preset_id, line_message_header, line_message_separator, line_message_include_frontend_url, default_type, default_brand, type_options, brand_options, feature_options, feature_bulk_status_enabled, feature_submit_lock_enabled, feature_dedupe_enabled")
     .eq("key", "main")
     .maybeSingle();
 
@@ -385,6 +417,8 @@ async function ensureDefaultRuntimeSettings(supabase: ReturnType<typeof getSupab
       .from("app_settings")
       .insert({
         key: "main",
+        edit_password: editPassword,
+        admin_password: adminSettingsPassword,
         google_drive_parent_folder_id: driveParentFolderId,
         line_notify_enabled: true,
         active_line_target_preset_id: presets[0]?.id || null,
@@ -393,6 +427,9 @@ async function ensureDefaultRuntimeSettings(supabase: ReturnType<typeof getSupab
         line_message_include_frontend_url: true,
         default_type: "",
         default_brand: "",
+        type_options: defaultTypeOptions,
+        brand_options: defaultBrandOptions,
+        feature_options: defaultFeatureOptions,
         feature_bulk_status_enabled: true,
         feature_submit_lock_enabled: true,
         feature_dedupe_enabled: true,
@@ -419,7 +456,7 @@ async function getRuntimeSettings(supabase: ReturnType<typeof getSupabaseClient>
   const [{ data: settingsRow, error: settingsError }, { data: presetRows, error: presetError }] = await Promise.all([
     supabase
       .from("app_settings")
-      .select("key, google_drive_parent_folder_id, line_notify_enabled, active_line_target_preset_id, line_message_header, line_message_separator, line_message_include_frontend_url, default_type, default_brand, feature_bulk_status_enabled, feature_submit_lock_enabled, feature_dedupe_enabled")
+      .select("key, edit_password, admin_password, google_drive_parent_folder_id, line_notify_enabled, active_line_target_preset_id, line_message_header, line_message_separator, line_message_include_frontend_url, default_type, default_brand, type_options, brand_options, feature_options, feature_bulk_status_enabled, feature_submit_lock_enabled, feature_dedupe_enabled")
       .eq("key", "main")
       .single(),
     supabase
@@ -449,6 +486,9 @@ function getPublicRuntimeSettings(settings: RuntimeSettings) {
     lineMessageIncludeFrontendUrl: settings.lineMessageIncludeFrontendUrl,
     defaultType: settings.defaultType,
     defaultBrand: settings.defaultBrand,
+    typeOptions: settings.typeOptions,
+    brandOptions: settings.brandOptions,
+    featureOptions: settings.featureOptions,
     featureBulkStatusEnabled: settings.featureBulkStatusEnabled,
     featureSubmitLockEnabled: settings.featureSubmitLockEnabled,
     featureDedupeEnabled: settings.featureDedupeEnabled,
@@ -690,7 +730,9 @@ async function listRecords() {
 async function handleVerifyPassword(request: Request) {
   const body = await request.json().catch(() => ({}));
   const password = typeof body?.password === "string" ? body.password : "";
-  return jsonResponse({ success: validatePassword(password) });
+  const supabase = getSupabaseClient();
+  const settings = await getRuntimeSettings(supabase);
+  return jsonResponse({ success: validatePassword(password, settings) });
 }
 
 async function handleStatusUpdate(request: Request) {
@@ -703,11 +745,12 @@ async function handleStatusUpdate(request: Request) {
   if (!id) {
     return jsonResponse({ success: false, message: "ไม่พบรหัสข้อมูล" }, 400);
   }
-  if (!validatePassword(password)) {
+  const supabase = getSupabaseClient();
+  const settings = await getRuntimeSettings(supabase);
+  if (!validatePassword(password, settings)) {
     return jsonResponse({ success: false, message: "รหัสผ่านไม่ถูกต้อง" }, 401);
   }
 
-  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from("computer_specs")
     .update({ status_image: statusImage, status_posted: statusPosted })
@@ -725,15 +768,16 @@ async function handleBatchStatusUpdate(request: Request) {
   const password = typeof body?.password === "string" ? body.password : "";
   const items = Array.isArray(body?.items) ? body.items : [];
 
-  if (!validatePassword(password)) {
-    return jsonResponse({ success: false, message: "รหัสผ่านไม่ถูกต้อง" }, 401);
-  }
-
   if (items.length === 0) {
     return jsonResponse({ success: false, message: "ไม่มีรายการที่ต้องบันทึก" }, 400);
   }
 
   const supabase = getSupabaseClient();
+  const settings = await getRuntimeSettings(supabase);
+  if (!validatePassword(password, settings)) {
+    return jsonResponse({ success: false, message: "รหัสผ่านไม่ถูกต้อง" }, 401);
+  }
+
   const results: Array<{ id: string; success: boolean; message?: string }> = [];
 
   for (const item of items) {
@@ -770,10 +814,12 @@ async function handleBatchStatusUpdate(request: Request) {
 }
 
 async function handleVerifyAdminPassword(request: Request) {
-  ensureAdminPasswordConfigured();
   const body = await request.json().catch(() => ({}));
   const password = typeof body?.password === "string" ? body.password : "";
-  return jsonResponse({ success: validateAdminPassword(password) });
+  const supabase = getSupabaseClient();
+  const settings = await getRuntimeSettings(supabase);
+  ensureAdminPasswordConfigured(settings);
+  return jsonResponse({ success: validateAdminPassword(password, settings) });
 }
 
 async function handleGetPublicConfig() {
@@ -783,29 +829,27 @@ async function handleGetPublicConfig() {
 }
 
 async function handleGetAdminSettings(request: Request) {
-  ensureAdminPasswordConfigured();
   const body = await request.json().catch(() => ({}));
   const password = typeof body?.password === "string" ? body.password : "";
-
-  if (!validateAdminPassword(password)) {
-    return jsonResponse({ success: false, message: "รหัสผ่านผู้ดูแลไม่ถูกต้อง" }, 401);
-  }
-
   const supabase = getSupabaseClient();
   const settings = await getRuntimeSettings(supabase);
+  ensureAdminPasswordConfigured(settings);
+  if (!validateAdminPassword(password, settings)) {
+    return jsonResponse({ success: false, message: "รหัสผ่านผู้ดูแลไม่ถูกต้อง" }, 401);
+  }
   return jsonResponse({ success: true, data: settings });
 }
 
 async function handleSaveAdminSettings(request: Request) {
-  ensureAdminPasswordConfigured();
   const body = await request.json().catch(() => ({}));
   const password = typeof body?.password === "string" ? body.password : "";
-
-  if (!validateAdminPassword(password)) {
+  const supabase = getSupabaseClient();
+  const currentSettings = await getRuntimeSettings(supabase);
+  ensureAdminPasswordConfigured(currentSettings);
+  if (!validateAdminPassword(password, currentSettings)) {
     return jsonResponse({ success: false, message: "รหัสผ่านผู้ดูแลไม่ถูกต้อง" }, 401);
   }
 
-  const supabase = getSupabaseClient();
   const lineTargetPresets = (Array.isArray(body?.lineTargetPresets) ? body.lineTargetPresets : []) as Array<Record<string, unknown>>;
   const normalizedPresets = lineTargetPresets
     .map((preset: Record<string, unknown>) => ({
@@ -888,7 +932,14 @@ async function handleSaveAdminSettings(request: Request) {
       activeLineTargetPresetId = null;
     }
   }
+  const nextEditPassword = typeof body?.editPassword === "string" ? body.editPassword.trim() : currentSettings.editPassword;
+  const nextAdminPassword = typeof body?.adminPassword === "string" ? body.adminPassword.trim() : currentSettings.adminPassword;
+  if (!nextEditPassword || !nextAdminPassword) {
+    return jsonResponse({ success: false, message: "กรุณากำหนดรหัสผ่าน Edit และ Admin ให้ครบ" }, 400);
+  }
   const settingsPayload = {
+    edit_password: nextEditPassword,
+    admin_password: nextAdminPassword,
     google_drive_parent_folder_id: typeof body?.googleDriveParentFolderId === "string" ? body.googleDriveParentFolderId.trim() : driveParentFolderId,
     line_notify_enabled: body?.lineNotifyEnabled !== false,
     active_line_target_preset_id: activeLineTargetPresetId,
@@ -897,6 +948,9 @@ async function handleSaveAdminSettings(request: Request) {
     line_message_include_frontend_url: body?.lineMessageIncludeFrontendUrl !== false,
     default_type: typeof body?.defaultType === "string" ? body.defaultType.trim() : "",
     default_brand: typeof body?.defaultBrand === "string" ? body.defaultBrand.trim() : "",
+    type_options: normalizeStringArray(body?.typeOptions, currentSettings.typeOptions),
+    brand_options: normalizeStringArray(body?.brandOptions, currentSettings.brandOptions),
+    feature_options: normalizeStringArray(body?.featureOptions, currentSettings.featureOptions),
     feature_bulk_status_enabled: body?.featureBulkStatusEnabled !== false,
     feature_submit_lock_enabled: body?.featureSubmitLockEnabled !== false,
     feature_dedupe_enabled: body?.featureDedupeEnabled !== false,
@@ -948,12 +1002,11 @@ async function handleCreateOrUpdate(request: Request) {
   }
 
   const isEdit = Boolean(payload.recId);
-  if (isEdit && !validatePassword(payload.password)) {
-    return jsonResponse({ success: false, message: "รหัสผ่านไม่ถูกต้อง" }, 401);
-  }
-
   const supabase = getSupabaseClient();
   const settings = await getRuntimeSettings(supabase);
+  if (isEdit && !validatePassword(payload.password, settings)) {
+    return jsonResponse({ success: false, message: "รหัสผ่านไม่ถูกต้อง" }, 401);
+  }
   const submissionState = !isEdit
     ? await beginSubmissionRequest(supabase, payload.submissionKey, settings.featureDedupeEnabled)
     : { normalizedKey: "", duplicateRecord: null as ReturnType<typeof mapRow> | null };
