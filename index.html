@@ -107,6 +107,89 @@
         background-color: #e9ecef;
         color: #0d6efd;
     }
+    .navbar-actions {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .toolbar-card {
+      border-radius: 12px;
+    }
+    .bulk-status-bar {
+      display: none;
+      gap: 0.75rem;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid #eef0f3;
+      background: #f8fbff;
+    }
+    .bulk-status-summary {
+      font-size: 0.92rem;
+      color: #0d6efd;
+      font-weight: 600;
+    }
+    .table tbody tr.row-dirty {
+      background: #f8fbff;
+    }
+    .table tbody tr.row-dirty td {
+      border-color: #d7e8ff;
+    }
+    .settings-preset-card {
+      border: 1px solid #e9ecef;
+      border-radius: 12px;
+      padding: 0.75rem;
+      background: #fff;
+    }
+    .settings-grid-label {
+      font-size: 0.82rem;
+      color: #6c757d;
+      margin-bottom: 0.35rem;
+    }
+    @media (max-width: 991.98px) {
+      .navbar .container-fluid {
+        gap: 0.75rem;
+      }
+      .navbar-brand {
+        font-size: 1rem;
+      }
+      .navbar-actions {
+        width: 100%;
+        justify-content: flex-end;
+      }
+    }
+    @media (max-width: 767.98px) {
+      .container-fluid.px-4 {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+      }
+      .progress-container {
+        width: calc(100% - 2rem);
+      }
+      .navbar-actions {
+        width: 100%;
+        justify-content: stretch;
+      }
+      .navbar-actions .btn {
+        flex: 1 1 0;
+      }
+      .table-responsive {
+        border-top: 1px solid #f1f3f5;
+      }
+      .pagination .page-link {
+        width: 34px;
+        height: 34px;
+      }
+      .bulk-status-bar {
+        align-items: stretch;
+      }
+      .bulk-status-bar .btn-group,
+      .bulk-status-bar .btn {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -129,9 +212,14 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top mb-4">
     <div class="container-fluid px-4">
       <a class="navbar-brand fw-bold text-primary" href="#"><i class="fas fa-server me-2"></i>IT Warehouse</a>
-      <button class="btn btn-primary btn-sm fw-bold rounded-pill px-3" onclick="openAddModal()">
-        <i class="fas fa-plus me-1"></i> เพิ่มข้อมูล
-      </button>
+      <div class="navbar-actions">
+        <button class="btn btn-light btn-sm fw-bold rounded-pill px-3 border" onclick="openAdminSettings()">
+          <i class="fas fa-sliders-h me-1"></i> ตั้งค่า
+        </button>
+        <button class="btn btn-primary btn-sm fw-bold rounded-pill px-3" onclick="openAddModal()">
+          <i class="fas fa-plus me-1"></i> เพิ่มข้อมูล
+        </button>
+      </div>
     </div>
   </nav>
 
@@ -147,11 +235,13 @@
     </div>
 
     <!-- Search & Filter -->
-    <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+    <div class="card border-0 shadow-sm mb-4 toolbar-card">
       <div class="card-body p-2">
         <div class="row g-2 align-items-center">
-          <div class="col-md-9"><div class="input-group"><span class="input-group-text bg-transparent border-0 ps-3"><i class="fas fa-search text-muted"></i></span><input type="text" id="searchInput" class="form-control border-0 shadow-none" placeholder="ค้นหา (ยี่ห้อ, รุ่น, CPU...)" style="background: transparent;"></div></div>
-          <div class="col-md-3"><select id="filterType" class="form-select border-0 bg-light rounded-pill px-3" style="cursor: pointer;"><option value="All">📦 ทุกประเภท</option><option value="PC">🖥️ PC</option><option value="Notebook">💻 Notebook</option><option value="All in One">📺 All in One</option></select></div>
+          <div class="col-12 col-lg-5"><div class="input-group"><span class="input-group-text bg-transparent border-0 ps-3"><i class="fas fa-search text-muted"></i></span><input type="text" id="searchInput" class="form-control border-0 shadow-none" placeholder="ค้นหา (ยี่ห้อ, รุ่น, CPU, RAM, หมายเหตุ...)" style="background: transparent;"></div></div>
+          <div class="col-6 col-lg-3"><select id="filterType" class="form-select border-0 bg-light rounded-pill px-3" style="cursor: pointer;"><option value="All">📦 ทุกประเภท</option><option value="PC">🖥️ PC</option><option value="Notebook">💻 Notebook</option><option value="All in One">📺 All in One</option><option value="Monitor">🖥️ Monitor</option></select></div>
+          <div class="col-6 col-lg-2"><select id="filterStatus" class="form-select border-0 bg-light rounded-pill px-3" style="cursor: pointer;"><option value="All">สถานะทั้งหมด</option><option value="pending">ยังไม่ครบ</option><option value="image-done">ทำรูปแล้ว</option><option value="posted-done">โพสต์แล้ว</option><option value="fully-done">ครบทั้งคู่</option></select></div>
+          <div class="col-12 col-lg-2 d-grid"><button type="button" class="btn btn-light border rounded-pill" onclick="resetFilters()"><i class="fas fa-rotate-left me-1"></i> ล้างตัวกรอง</button></div>
         </div>
       </div>
     </div>
@@ -159,6 +249,16 @@
     <!-- Table -->
     <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
       <div class="card-body p-0">
+        <div id="bulkStatusBar" class="bulk-status-bar">
+          <div>
+            <div class="bulk-status-summary" id="bulkStatusSummary">ยังไม่มีรายการที่เลือกไว้</div>
+            <div class="small text-muted" id="bulkStatusHint">ติ๊กหลายแถวแล้วบันทึกพร้อมกันได้</div>
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-light border rounded-pill px-3" onclick="clearPendingStatusChanges()">ยกเลิกที่เลือก</button>
+            <button type="button" id="btnSaveAllStatuses" class="btn btn-success rounded-pill px-3" onclick="saveAllStatusChanges()"><i class="fas fa-check me-1"></i> บันทึกที่เลือกทั้งหมด</button>
+          </div>
+        </div>
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
             <thead class="bg-light">
@@ -194,6 +294,7 @@
             <input type="hidden" id="recId">
             <input type="hidden" id="currentFolderLink">
             <input type="hidden" id="currentDate">
+            <input type="hidden" id="submissionNonce">
             <div class="row g-3">
               <div class="col-md-4">
                 <label class="form-label small text-muted">ประเภท <span class="text-danger">*</span></label>
@@ -287,6 +388,116 @@
               </ul>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="adminSettingsModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+        <div class="modal-header border-0">
+          <div>
+            <h5 class="modal-title fw-bold text-primary mb-1">Admin Settings</h5>
+            <div class="small text-muted">ปรับค่าที่เปลี่ยนบ่อยได้โดยไม่ต้องแก้ env ทุกครั้ง</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-4">
+            <div class="col-12 col-lg-6">
+              <div class="card border-0 bg-light h-100">
+                <div class="card-body">
+                  <h6 class="fw-bold mb-3">LINE Settings</h6>
+                  <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="settingsLineNotifyEnabled">
+                    <label class="form-check-label" for="settingsLineNotifyEnabled">เปิดการส่ง LINE แจ้งเตือน</label>
+                  </div>
+                  <div class="mb-3">
+                    <label class="settings-grid-label">ปลายทาง LINE ที่ใช้งานอยู่</label>
+                    <select id="settingsActiveLineTargetPresetId" class="form-select rounded-3"></select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="settings-grid-label">ข้อความหัวแจ้งเตือน</label>
+                    <input type="text" id="settingsLineMessageHeader" class="form-control rounded-3">
+                  </div>
+                  <div class="mb-3">
+                    <label class="settings-grid-label">เส้นคั่นข้อความ</label>
+                    <input type="text" id="settingsLineMessageSeparator" class="form-control rounded-3">
+                  </div>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="settingsLineIncludeFrontendUrl">
+                    <label class="form-check-label" for="settingsLineIncludeFrontendUrl">แนบลิงก์หน้าเว็บท้ายข้อความ</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-lg-6">
+              <div class="card border-0 bg-light h-100">
+                <div class="card-body">
+                  <h6 class="fw-bold mb-3">Default & Feature Settings</h6>
+                  <div class="mb-3">
+                    <label class="settings-grid-label">Google Drive Parent Folder ID</label>
+                    <input type="text" id="settingsDriveParentFolderId" class="form-control rounded-3">
+                  </div>
+                  <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                      <label class="settings-grid-label">ประเภทตั้งต้น</label>
+                      <select id="settingsDefaultType" class="form-select rounded-3">
+                        <option value="">ไม่กำหนด</option>
+                        <option value="PC">PC</option>
+                        <option value="Notebook">Notebook</option>
+                        <option value="All in One">All in One</option>
+                        <option value="Monitor">Monitor</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="settings-grid-label">ยี่ห้อตั้งต้น</label>
+                      <input type="text" id="settingsDefaultBrand" class="form-control rounded-3">
+                    </div>
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-12">
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingsFeatureBulkStatusEnabled">
+                        <label class="form-check-label" for="settingsFeatureBulkStatusEnabled">เปิด bulk status save</label>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingsFeatureSubmitLockEnabled">
+                        <label class="form-check-label" for="settingsFeatureSubmitLockEnabled">เปิดป้องกันการกดบันทึกซ้ำ</label>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingsFeatureDedupeEnabled">
+                        <label class="form-check-label" for="settingsFeatureDedupeEnabled">เปิด duplicate submission protection</label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="card border-0 bg-light">
+                <div class="card-body">
+                  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <div>
+                      <h6 class="fw-bold mb-1">LINE Target Presets</h6>
+                      <div class="small text-muted">เก็บหลายปลายทาง เช่น ส่วนตัว / กลุ่มขายจริง / กลุ่มทดสอบ แล้วเลือกตัวที่ active ได้</div>
+                    </div>
+                    <button type="button" class="btn btn-primary rounded-pill px-3" onclick="addLineTargetPresetRow()"><i class="fas fa-plus me-1"></i> เพิ่มปลายทาง</button>
+                  </div>
+                  <div id="lineTargetPresetList" class="d-flex flex-column gap-3"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">ปิด</button>
+          <button type="button" class="btn btn-primary rounded-pill px-4" onclick="saveAdminSettings()"><i class="fas fa-save me-1"></i> บันทึกการตั้งค่า</button>
         </div>
       </div>
     </div>

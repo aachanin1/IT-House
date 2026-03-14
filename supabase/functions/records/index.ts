@@ -36,12 +36,56 @@ type RecordPayload = {
   remarks: string;
   keptExistingImages: string[];
   password: string;
+  submissionKey: string;
+};
+
+type AppSettingsRow = {
+  key: string;
+  google_drive_parent_folder_id: string;
+  line_notify_enabled: boolean;
+  active_line_target_preset_id: string | null;
+  line_message_header: string;
+  line_message_separator: string;
+  line_message_include_frontend_url: boolean;
+  default_type: string;
+  default_brand: string;
+  feature_bulk_status_enabled: boolean;
+  feature_submit_lock_enabled: boolean;
+  feature_dedupe_enabled: boolean;
+};
+
+type LineTargetPresetRow = {
+  id: string;
+  name: string;
+  target_id: string;
+  is_enabled: boolean;
+};
+
+type RuntimeSettings = {
+  googleDriveParentFolderId: string;
+  lineNotifyEnabled: boolean;
+  activeLineTargetPresetId: string | null;
+  lineMessageHeader: string;
+  lineMessageSeparator: string;
+  lineMessageIncludeFrontendUrl: boolean;
+  defaultType: string;
+  defaultBrand: string;
+  featureBulkStatusEnabled: boolean;
+  featureSubmitLockEnabled: boolean;
+  featureDedupeEnabled: boolean;
+  lineTargetPresets: Array<{
+    id: string;
+    name: string;
+    targetId: string;
+    isEnabled: boolean;
+  }>;
 };
 
 const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") || "*";
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const editPassword = Deno.env.get("EDIT_PASSWORD") || "";
+const adminSettingsPassword = Deno.env.get("ADMIN_SETTINGS_PASSWORD") || "";
 const driveParentFolderId = Deno.env.get("GOOGLE_DRIVE_PARENT_FOLDER_ID") || "";
 const googleOAuthClientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID") || "";
 const googleOAuthClientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET") || "";
@@ -138,6 +182,16 @@ function mapRow(row: RecordRow) {
 
 function validatePassword(password: string) {
   return Boolean(editPassword) && password === editPassword;
+}
+
+function validateAdminPassword(password: string) {
+  return Boolean(adminSettingsPassword) && password === adminSettingsPassword;
+}
+
+function ensureAdminPasswordConfigured() {
+  if (!adminSettingsPassword) {
+    throw new Error("ยังไม่ได้ตั้งค่า ADMIN_SETTINGS_PASSWORD สำหรับหน้า Admin Settings");
+  }
 }
 
 function ensureRequired(payload: RecordPayload) {
@@ -264,6 +318,230 @@ async function deleteDriveFile(fileId: string) {
   });
 }
 
+function mapRuntimeSettings(settingsRow: AppSettingsRow, presets: LineTargetPresetRow[]): RuntimeSettings {
+  return {
+    googleDriveParentFolderId: settingsRow.google_drive_parent_folder_id || driveParentFolderId,
+    lineNotifyEnabled: Boolean(settingsRow.line_notify_enabled),
+    activeLineTargetPresetId: settingsRow.active_line_target_preset_id || null,
+    lineMessageHeader: settingsRow.line_message_header || "แจ้งเตือน: มีการเพิ่มข้อมูลใหม่",
+    lineMessageSeparator: settingsRow.line_message_separator || "---------------------------",
+    lineMessageIncludeFrontendUrl: Boolean(settingsRow.line_message_include_frontend_url),
+    defaultType: settingsRow.default_type || "",
+    defaultBrand: settingsRow.default_brand || "",
+    featureBulkStatusEnabled: Boolean(settingsRow.feature_bulk_status_enabled),
+    featureSubmitLockEnabled: Boolean(settingsRow.feature_submit_lock_enabled),
+    featureDedupeEnabled: Boolean(settingsRow.feature_dedupe_enabled),
+    lineTargetPresets: presets.map((preset) => ({
+      id: preset.id,
+      name: preset.name,
+      targetId: preset.target_id,
+      isEnabled: Boolean(preset.is_enabled),
+    })),
+  };
+}
+
+async function ensureDefaultRuntimeSettings(supabase: ReturnType<typeof getSupabaseClient>) {
+  const { data: presetRows, error: presetError } = await supabase
+    .from("line_target_presets")
+    .select("id, name, target_id, is_enabled")
+    .order("created_at", { ascending: true });
+
+  if (presetError) {
+    throw new Error(presetError.message);
+  }
+
+  let presets = (presetRows || []) as LineTargetPresetRow[];
+
+  if (presets.length === 0 && lineTargetId) {
+    const { data: insertedPreset, error: insertPresetError } = await supabase
+      .from("line_target_presets")
+      .insert({
+        name: "ค่าเริ่มต้น",
+        target_id: lineTargetId,
+        is_enabled: true,
+      })
+      .select("id, name, target_id, is_enabled")
+      .single();
+
+    if (insertPresetError) {
+      throw new Error(insertPresetError.message);
+    }
+
+    presets = [insertedPreset as LineTargetPresetRow];
+  }
+
+  const { data: settingsRow, error: settingsError } = await supabase
+    .from("app_settings")
+    .select("key, google_drive_parent_folder_id, line_notify_enabled, active_line_target_preset_id, line_message_header, line_message_separator, line_message_include_frontend_url, default_type, default_brand, feature_bulk_status_enabled, feature_submit_lock_enabled, feature_dedupe_enabled")
+    .eq("key", "main")
+    .maybeSingle();
+
+  if (settingsError) {
+    throw new Error(settingsError.message);
+  }
+
+  if (!settingsRow) {
+    const { error: insertSettingsError } = await supabase
+      .from("app_settings")
+      .insert({
+        key: "main",
+        google_drive_parent_folder_id: driveParentFolderId,
+        line_notify_enabled: true,
+        active_line_target_preset_id: presets[0]?.id || null,
+        line_message_header: "แจ้งเตือน: มีการเพิ่มข้อมูลใหม่",
+        line_message_separator: "---------------------------",
+        line_message_include_frontend_url: true,
+        default_type: "",
+        default_brand: "",
+        feature_bulk_status_enabled: true,
+        feature_submit_lock_enabled: true,
+        feature_dedupe_enabled: true,
+      });
+
+    if (insertSettingsError) {
+      throw new Error(insertSettingsError.message);
+    }
+  } else if (!settingsRow.active_line_target_preset_id && presets[0]?.id) {
+    const { error: updateSettingsError } = await supabase
+      .from("app_settings")
+      .update({ active_line_target_preset_id: presets[0].id })
+      .eq("key", "main");
+
+    if (updateSettingsError) {
+      throw new Error(updateSettingsError.message);
+    }
+  }
+}
+
+async function getRuntimeSettings(supabase: ReturnType<typeof getSupabaseClient>) {
+  await ensureDefaultRuntimeSettings(supabase);
+
+  const [{ data: settingsRow, error: settingsError }, { data: presetRows, error: presetError }] = await Promise.all([
+    supabase
+      .from("app_settings")
+      .select("key, google_drive_parent_folder_id, line_notify_enabled, active_line_target_preset_id, line_message_header, line_message_separator, line_message_include_frontend_url, default_type, default_brand, feature_bulk_status_enabled, feature_submit_lock_enabled, feature_dedupe_enabled")
+      .eq("key", "main")
+      .single(),
+    supabase
+      .from("line_target_presets")
+      .select("id, name, target_id, is_enabled")
+      .order("created_at", { ascending: true }),
+  ]);
+
+  if (settingsError) {
+    throw new Error(settingsError.message);
+  }
+
+  if (presetError) {
+    throw new Error(presetError.message);
+  }
+
+  return mapRuntimeSettings(settingsRow as AppSettingsRow, (presetRows || []) as LineTargetPresetRow[]);
+}
+
+function getPublicRuntimeSettings(settings: RuntimeSettings) {
+  return {
+    googleDriveParentFolderId: settings.googleDriveParentFolderId,
+    lineNotifyEnabled: settings.lineNotifyEnabled,
+    activeLineTargetPresetId: settings.activeLineTargetPresetId,
+    lineMessageHeader: settings.lineMessageHeader,
+    lineMessageSeparator: settings.lineMessageSeparator,
+    lineMessageIncludeFrontendUrl: settings.lineMessageIncludeFrontendUrl,
+    defaultType: settings.defaultType,
+    defaultBrand: settings.defaultBrand,
+    featureBulkStatusEnabled: settings.featureBulkStatusEnabled,
+    featureSubmitLockEnabled: settings.featureSubmitLockEnabled,
+    featureDedupeEnabled: settings.featureDedupeEnabled,
+    lineTargetPresetNames: settings.lineTargetPresets
+      .filter((preset) => preset.isEnabled)
+      .map((preset) => ({ id: preset.id, name: preset.name })),
+  };
+}
+
+async function beginSubmissionRequest(supabase: ReturnType<typeof getSupabaseClient>, submissionKey: string, dedupeEnabled: boolean) {
+  const normalizedKey = submissionKey.trim();
+  if (!dedupeEnabled || !normalizedKey) {
+    return { normalizedKey: "", duplicateRecord: null as ReturnType<typeof mapRow> | null };
+  }
+
+  const { data: existingRow, error: existingError } = await supabase
+    .from("record_submission_requests")
+    .select("submission_key, status, record_id, created_at")
+    .eq("submission_key", normalizedKey)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  if (existingRow?.record_id) {
+    const { data: existingRecord, error: existingRecordError } = await supabase
+      .from("computer_specs")
+      .select("id, created_at, type, brand, model, cpu, ram, storage, display_size, price, features, remarks, folder_link, image_links, status_image, status_posted")
+      .eq("id", existingRow.record_id)
+      .maybeSingle();
+
+    if (existingRecordError) {
+      throw new Error(existingRecordError.message);
+    }
+
+    if (existingRecord) {
+      return { normalizedKey, duplicateRecord: mapRow(existingRecord as RecordRow) };
+    }
+  }
+
+  if (existingRow?.status === "processing") {
+    throw new Error("คำขอนี้กำลังประมวลผลอยู่ กรุณารอสักครู่แล้วตรวจสอบรายการล่าสุดก่อนลองใหม่อีกครั้ง");
+  }
+
+  const payload = {
+    submission_key: normalizedKey,
+    status: "processing",
+    record_id: null,
+  };
+
+  if (existingRow) {
+    const { error: updateError } = await supabase
+      .from("record_submission_requests")
+      .update(payload)
+      .eq("submission_key", normalizedKey);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+  } else {
+    const { error: insertError } = await supabase
+      .from("record_submission_requests")
+      .insert(payload);
+
+    if (insertError) {
+      throw new Error(insertError.message);
+    }
+  }
+
+  return { normalizedKey, duplicateRecord: null as ReturnType<typeof mapRow> | null };
+}
+
+async function completeSubmissionRequest(supabase: ReturnType<typeof getSupabaseClient>, submissionKey: string, recordId: string) {
+  if (!submissionKey) return;
+  const { error } = await supabase
+    .from("record_submission_requests")
+    .update({ status: "completed", record_id: recordId })
+    .eq("submission_key", submissionKey);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+async function failSubmissionRequest(supabase: ReturnType<typeof getSupabaseClient>, submissionKey: string) {
+  if (!submissionKey) return;
+  await supabase
+    .from("record_submission_requests")
+    .update({ status: "failed" })
+    .eq("submission_key", submissionKey);
+}
+
 function concatUint8Arrays(chunks: Uint8Array[]) {
   const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
   const result = new Uint8Array(totalLength);
@@ -309,8 +587,9 @@ async function uploadFileToDrive(folderId: string, file: File, fileName: string)
   };
 }
 
-async function ensureDriveFolder(payload: RecordPayload) {
-  if (!driveParentFolderId) {
+async function ensureDriveFolder(payload: RecordPayload, settings: RuntimeSettings) {
+  const parentFolderId = settings.googleDriveParentFolderId || driveParentFolderId;
+  if (!parentFolderId) {
     throw new Error("Google Drive parent folder is not configured");
   }
 
@@ -334,16 +613,16 @@ async function ensureDriveFolder(payload: RecordPayload) {
     };
   }
 
-  const created = await createFolder(desiredName, driveParentFolderId);
+  const created = await createFolder(desiredName, parentFolderId);
   return {
     id: created.id as string,
     link: (created.webViewLink as string) || `https://drive.google.com/drive/folders/${created.id}`,
   };
 }
 
-function buildLineMessage(row: ReturnType<typeof mapRow>) {
-  let message = "แจ้งเตือน: มีการเพิ่มข้อมูลใหม่\n";
-  message += "---------------------------\n";
+function buildLineMessage(row: ReturnType<typeof mapRow>, settings: RuntimeSettings) {
+  let message = `${settings.lineMessageHeader || "แจ้งเตือน: มีการเพิ่มข้อมูลใหม่"}\n`;
+  message += `${settings.lineMessageSeparator || "---------------------------"}\n`;
   message += `ประเภท: ${row.type}\n`;
   message += `รุ่น: ${row.brand} ${row.model}\n`;
   message += `CPU: ${row.cpu}\n`;
@@ -359,14 +638,18 @@ function buildLineMessage(row: ReturnType<typeof mapRow>) {
     message += `หมายเหตุ: ${row.remarks}\n`;
   }
   message += `ราคา: ${Number(row.price).toLocaleString()} บาท\n`;
-  if (frontendUrl) {
-    message += `---------------------------\n${frontendUrl}`;
+  if (settings.lineMessageIncludeFrontendUrl && frontendUrl) {
+    message += `${settings.lineMessageSeparator || "---------------------------"}\n${frontendUrl}`;
   }
   return message;
 }
 
-async function pushLineNotification(row: ReturnType<typeof mapRow>) {
-  if (!lineChannelAccessToken || !lineTargetId) {
+async function pushLineNotification(row: ReturnType<typeof mapRow>, settings: RuntimeSettings) {
+  const activePreset = settings.lineTargetPresets.find((preset) => preset.id === settings.activeLineTargetPresetId && preset.isEnabled)
+    || settings.lineTargetPresets.find((preset) => preset.isEnabled)
+    || null;
+
+  if (!lineChannelAccessToken || !settings.lineNotifyEnabled || !activePreset?.targetId) {
     return { sent: false, skipped: true };
   }
 
@@ -377,8 +660,8 @@ async function pushLineNotification(row: ReturnType<typeof mapRow>) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      to: lineTargetId,
-      messages: [{ type: "text", text: buildLineMessage(row) }],
+      to: activePreset.targetId,
+      messages: [{ type: "text", text: buildLineMessage(row, settings) }],
     }),
   });
 
@@ -437,6 +720,203 @@ async function handleStatusUpdate(request: Request) {
   return jsonResponse({ success: true, message: "บันทึกสถานะเรียบร้อย" });
 }
 
+async function handleBatchStatusUpdate(request: Request) {
+  const body = await request.json().catch(() => ({}));
+  const password = typeof body?.password === "string" ? body.password : "";
+  const items = Array.isArray(body?.items) ? body.items : [];
+
+  if (!validatePassword(password)) {
+    return jsonResponse({ success: false, message: "รหัสผ่านไม่ถูกต้อง" }, 401);
+  }
+
+  if (items.length === 0) {
+    return jsonResponse({ success: false, message: "ไม่มีรายการที่ต้องบันทึก" }, 400);
+  }
+
+  const supabase = getSupabaseClient();
+  const results: Array<{ id: string; success: boolean; message?: string }> = [];
+
+  for (const item of items) {
+    const id = typeof item?.id === "string" ? item.id : "";
+    if (!id) {
+      results.push({ id: "", success: false, message: "ไม่พบรหัสข้อมูล" });
+      continue;
+    }
+
+    const { error } = await supabase
+      .from("computer_specs")
+      .update({
+        status_image: Boolean(item?.statusImage),
+        status_posted: Boolean(item?.statusPosted),
+      })
+      .eq("id", id);
+
+    if (error) {
+      results.push({ id, success: false, message: error.message });
+      continue;
+    }
+
+    results.push({ id, success: true });
+  }
+
+  const successCount = results.filter((item) => item.success).length;
+  const failedCount = results.length - successCount;
+
+  return jsonResponse({
+    success: failedCount === 0,
+    message: failedCount === 0 ? "บันทึกสถานะเรียบร้อย" : `บันทึกสำเร็จ ${successCount} รายการ และล้มเหลว ${failedCount} รายการ`,
+    results,
+  }, failedCount === 0 ? 200 : 207);
+}
+
+async function handleVerifyAdminPassword(request: Request) {
+  ensureAdminPasswordConfigured();
+  const body = await request.json().catch(() => ({}));
+  const password = typeof body?.password === "string" ? body.password : "";
+  return jsonResponse({ success: validateAdminPassword(password) });
+}
+
+async function handleGetPublicConfig() {
+  const supabase = getSupabaseClient();
+  const settings = await getRuntimeSettings(supabase);
+  return jsonResponse({ success: true, data: getPublicRuntimeSettings(settings) });
+}
+
+async function handleGetAdminSettings(request: Request) {
+  ensureAdminPasswordConfigured();
+  const body = await request.json().catch(() => ({}));
+  const password = typeof body?.password === "string" ? body.password : "";
+
+  if (!validateAdminPassword(password)) {
+    return jsonResponse({ success: false, message: "รหัสผ่านผู้ดูแลไม่ถูกต้อง" }, 401);
+  }
+
+  const supabase = getSupabaseClient();
+  const settings = await getRuntimeSettings(supabase);
+  return jsonResponse({ success: true, data: settings });
+}
+
+async function handleSaveAdminSettings(request: Request) {
+  ensureAdminPasswordConfigured();
+  const body = await request.json().catch(() => ({}));
+  const password = typeof body?.password === "string" ? body.password : "";
+
+  if (!validateAdminPassword(password)) {
+    return jsonResponse({ success: false, message: "รหัสผ่านผู้ดูแลไม่ถูกต้อง" }, 401);
+  }
+
+  const supabase = getSupabaseClient();
+  const lineTargetPresets = (Array.isArray(body?.lineTargetPresets) ? body.lineTargetPresets : []) as Array<Record<string, unknown>>;
+  const normalizedPresets = lineTargetPresets
+    .map((preset: Record<string, unknown>) => ({
+      id: typeof preset?.id === "string" && !preset.id.startsWith("local-") ? preset.id : "",
+      name: typeof preset?.name === "string" ? preset.name.trim() : "",
+      target_id: typeof preset?.targetId === "string" ? preset.targetId.trim() : "",
+      is_enabled: preset?.isEnabled !== false,
+    }))
+    .filter((preset) => preset.name && preset.target_id);
+
+  const { data: existingPresets, error: existingPresetsError } = await supabase
+    .from("line_target_presets")
+    .select("id");
+
+  if (existingPresetsError) {
+    throw new Error(existingPresetsError.message);
+  }
+
+  const incomingIds = new Set(normalizedPresets.map((preset) => preset.id).filter(Boolean));
+  const existingIds = (existingPresets || []).map((item: { id: string }) => item.id);
+  const idsToDelete = existingIds.filter((id: string) => !incomingIds.has(id));
+
+  if (idsToDelete.length > 0) {
+    const { error: deletePresetsError } = await supabase
+      .from("line_target_presets")
+      .delete()
+      .in("id", idsToDelete);
+
+    if (deletePresetsError) {
+      throw new Error(deletePresetsError.message);
+    }
+  }
+
+  if (normalizedPresets.length > 0) {
+    const { error: insertPresetsError } = await supabase
+      .from("line_target_presets")
+      .insert(normalizedPresets.filter((preset) => !preset.id).map((preset) => ({
+        name: preset.name,
+        target_id: preset.target_id,
+        is_enabled: preset.is_enabled,
+      })));
+
+    if (insertPresetsError) {
+      throw new Error(insertPresetsError.message);
+    }
+
+    for (const preset of normalizedPresets.filter((item) => item.id)) {
+      const { error: updatePresetError } = await supabase
+        .from("line_target_presets")
+        .update({
+          name: preset.name,
+          target_id: preset.target_id,
+          is_enabled: preset.is_enabled,
+        })
+        .eq("id", preset.id);
+
+      if (updatePresetError) {
+        throw new Error(updatePresetError.message);
+      }
+    }
+  }
+
+  let activeLineTargetPresetId = typeof body?.activeLineTargetPresetId === "string" ? body.activeLineTargetPresetId : null;
+  if (activeLineTargetPresetId?.startsWith("local-")) {
+    const matchingLocalPreset = lineTargetPresets.find((preset) => preset?.id === activeLineTargetPresetId);
+    if (matchingLocalPreset) {
+      const { data: refreshedPresets, error: refreshedPresetsError } = await supabase
+        .from("line_target_presets")
+        .select("id, name, target_id, is_enabled");
+
+      if (refreshedPresetsError) {
+        throw new Error(refreshedPresetsError.message);
+      }
+
+      const matchedPreset = (refreshedPresets || []).find((preset: LineTargetPresetRow) => (
+        preset.name === matchingLocalPreset.name && preset.target_id === matchingLocalPreset.targetId
+      ));
+      activeLineTargetPresetId = matchedPreset?.id || null;
+    } else {
+      activeLineTargetPresetId = null;
+    }
+  }
+  const settingsPayload = {
+    google_drive_parent_folder_id: typeof body?.googleDriveParentFolderId === "string" ? body.googleDriveParentFolderId.trim() : driveParentFolderId,
+    line_notify_enabled: body?.lineNotifyEnabled !== false,
+    active_line_target_preset_id: activeLineTargetPresetId,
+    line_message_header: typeof body?.lineMessageHeader === "string" ? body.lineMessageHeader.trim() : "แจ้งเตือน: มีการเพิ่มข้อมูลใหม่",
+    line_message_separator: typeof body?.lineMessageSeparator === "string" ? body.lineMessageSeparator.trim() : "---------------------------",
+    line_message_include_frontend_url: body?.lineMessageIncludeFrontendUrl !== false,
+    default_type: typeof body?.defaultType === "string" ? body.defaultType.trim() : "",
+    default_brand: typeof body?.defaultBrand === "string" ? body.defaultBrand.trim() : "",
+    feature_bulk_status_enabled: body?.featureBulkStatusEnabled !== false,
+    feature_submit_lock_enabled: body?.featureSubmitLockEnabled !== false,
+    feature_dedupe_enabled: body?.featureDedupeEnabled !== false,
+  };
+
+  await ensureDefaultRuntimeSettings(supabase);
+
+  const { error: settingsError } = await supabase
+    .from("app_settings")
+    .update(settingsPayload)
+    .eq("key", "main");
+
+  if (settingsError) {
+    throw new Error(settingsError.message);
+  }
+
+  const settings = await getRuntimeSettings(supabase);
+  return jsonResponse({ success: true, message: "บันทึกการตั้งค่าเรียบร้อย", data: settings });
+}
+
 async function readRecordPayload(formData: FormData): Promise<RecordPayload> {
   return {
     recId: getText(formData, "recId"),
@@ -454,6 +934,7 @@ async function readRecordPayload(formData: FormData): Promise<RecordPayload> {
     remarks: getText(formData, "remarks"),
     keptExistingImages: parseJsonArray(formData.get("keptExistingImages")),
     password: getText(formData, "password"),
+    submissionKey: getText(formData, "submissionKey"),
   };
 }
 
@@ -471,8 +952,22 @@ async function handleCreateOrUpdate(request: Request) {
     return jsonResponse({ success: false, message: "รหัสผ่านไม่ถูกต้อง" }, 401);
   }
 
-  const driveFolder = await ensureDriveFolder(payload);
   const supabase = getSupabaseClient();
+  const settings = await getRuntimeSettings(supabase);
+  const submissionState = !isEdit
+    ? await beginSubmissionRequest(supabase, payload.submissionKey, settings.featureDedupeEnabled)
+    : { normalizedKey: "", duplicateRecord: null as ReturnType<typeof mapRow> | null };
+
+  if (submissionState.duplicateRecord) {
+    return jsonResponse({
+      success: true,
+      message: "รายการนี้ถูกบันทึกไปแล้วจากคำขอก่อนหน้า",
+      data: submissionState.duplicateRecord,
+      duplicate: true,
+    });
+  }
+
+  const driveFolder = await ensureDriveFolder(payload, settings);
   const uploadedFiles: Array<{ id: string; link: string }> = [];
 
   try {
@@ -535,11 +1030,13 @@ async function handleCreateOrUpdate(request: Request) {
     const mapped = mapRow(data as RecordRow);
 
     try {
-      await pushLineNotification(mapped);
+      await pushLineNotification(mapped, settings);
     } catch (notifyError) {
       await supabase.from("computer_specs").delete().eq("id", mapped.id);
       throw notifyError;
     }
+
+    await completeSubmissionRequest(supabase, submissionState.normalizedKey, mapped.id);
 
     return jsonResponse({
       success: true,
@@ -550,6 +1047,7 @@ async function handleCreateOrUpdate(request: Request) {
     if (uploadedFiles.length > 0) {
       await Promise.allSettled(uploadedFiles.map(file => deleteDriveFile(file.id)));
     }
+    await failSubmissionRequest(supabase, submissionState.normalizedKey);
     throw error;
   }
 }
@@ -563,6 +1061,10 @@ serve(async (request: Request) => {
     const url = new URL(request.url);
     const action = url.searchParams.get("action") || "";
 
+    if (request.method === "GET" && action === "config") {
+      return await handleGetPublicConfig();
+    }
+
     if (request.method === "GET") {
       const data = await listRecords();
       return jsonResponse({ success: true, data });
@@ -572,8 +1074,24 @@ serve(async (request: Request) => {
       return await handleVerifyPassword(request);
     }
 
+    if (request.method === "POST" && action === "verify-admin-password") {
+      return await handleVerifyAdminPassword(request);
+    }
+
+    if (request.method === "POST" && action === "get-admin-settings") {
+      return await handleGetAdminSettings(request);
+    }
+
+    if (request.method === "POST" && action === "save-admin-settings") {
+      return await handleSaveAdminSettings(request);
+    }
+
     if (request.method === "PATCH" && action === "status") {
       return await handleStatusUpdate(request);
+    }
+
+    if (request.method === "PATCH" && action === "status-batch") {
+      return await handleBatchStatusUpdate(request);
     }
 
     if (request.method === "POST") {
