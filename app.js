@@ -641,6 +641,7 @@ function renderPage() {
 
   paginatedItems.forEach((item) => {
     const resolved = getResolvedStatus(item);
+    const normalizedType = normalizeProductType(item.type || "");
     let imageSrc = placeholderImg;
     if (item.imageLinks && item.imageLinks.length > 5) {
       const firstImg = item.imageLinks.split(",")[0];
@@ -658,6 +659,52 @@ function renderPage() {
     const safeFeatures = escapeHtml(item.features || "-");
     const safeRemarks = escapeHtml(item.remarks || "-");
     const priceLabel = Number(item.price).toLocaleString();
+    const specItems = [];
+    if (normalizedType !== "printer" && normalizedType !== "monitor" && safeCpu !== "-") {
+      specItems.push({ label: "CPU", value: safeCpu });
+    }
+    if (normalizedType !== "printer" && normalizedType !== "monitor" && safeRam !== "-") {
+      specItems.push({ label: "RAM", value: safeRam });
+    }
+    if (normalizedType !== "printer" && normalizedType !== "monitor" && safeStorage !== "-") {
+      specItems.push({ label: "Storage", value: safeStorage });
+    }
+    if (normalizedType !== "printer" && safeDisplay !== "-") {
+      specItems.push({ label: "Display", value: safeDisplay });
+    }
+    const metaItems = [];
+    if (safeFeatures !== "-") {
+      metaItems.push({ label: "คุณสมบัติ", value: safeFeatures });
+    }
+    if (safeRemarks !== "-") {
+      metaItems.push({ label: "หมายเหตุ", value: safeRemarks });
+    }
+    const specsSection = specItems.length > 0
+      ? `
+      <div class="record-card-section">
+        <div class="record-card-section-title">สเปคหลัก</div>
+        <div class="record-card-spec-grid">
+          ${specItems.map((spec) => `
+          <div class="record-card-spec-item">
+            <div class="record-card-spec-label">${spec.label}</div>
+            <div class="record-card-spec-value">${spec.value}</div>
+          </div>`).join("")}
+        </div>
+      </div>`
+      : "";
+    const metaSection = metaItems.length > 0
+      ? `
+      <div class="record-card-section">
+        <div class="record-card-section-title">รายละเอียดเพิ่มเติม</div>
+        <div class="record-card-meta-list">
+          ${metaItems.map((meta) => `
+          <div class="record-card-meta-row">
+            <div class="record-card-meta-label">${meta.label}</div>
+            <div class="record-card-meta-value">${meta.value}</div>
+          </div>`).join("")}
+        </div>
+      </div>`
+      : "";
 
     const card = document.createElement("article");
     card.id = `row_${item.id}`;
@@ -681,40 +728,8 @@ function renderPage() {
         </div>
         <div class="record-card-price-value">${priceLabel} บาท</div>
       </div>
-      <div class="record-card-section">
-        <div class="record-card-section-title">สเปคหลัก</div>
-        <div class="record-card-spec-grid">
-          <div class="record-card-spec-item">
-            <div class="record-card-spec-label">CPU</div>
-            <div class="record-card-spec-value">${safeCpu}</div>
-          </div>
-          <div class="record-card-spec-item">
-            <div class="record-card-spec-label">RAM</div>
-            <div class="record-card-spec-value">${safeRam}</div>
-          </div>
-          <div class="record-card-spec-item">
-            <div class="record-card-spec-label">Storage</div>
-            <div class="record-card-spec-value">${safeStorage}</div>
-          </div>
-          <div class="record-card-spec-item">
-            <div class="record-card-spec-label">Display</div>
-            <div class="record-card-spec-value">${safeDisplay}</div>
-          </div>
-        </div>
-      </div>
-      <div class="record-card-section">
-        <div class="record-card-section-title">รายละเอียดเพิ่มเติม</div>
-        <div class="record-card-meta-list">
-          <div class="record-card-meta-row">
-            <div class="record-card-meta-label">คุณสมบัติ</div>
-            <div class="record-card-meta-value">${safeFeatures}</div>
-          </div>
-          <div class="record-card-meta-row">
-            <div class="record-card-meta-label">หมายเหตุ</div>
-            <div class="record-card-meta-value">${safeRemarks}</div>
-          </div>
-        </div>
-      </div>
+      ${specsSection}
+      ${metaSection}
       <div class="record-card-section">
         <div class="record-card-section-title">สถานะงาน</div>
         <div class="record-card-status">
