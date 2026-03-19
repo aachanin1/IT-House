@@ -148,95 +148,259 @@
       color: #6c757d;
       margin-bottom: 0.35rem;
     }
-    .records-table-wrap {
-      display: block;
-    }
-    .records-mobile-list {
-      display: none;
-      padding: 0.9rem;
-      gap: 0.9rem;
+    .record-grid-wrap {
+      padding: 1rem;
       background: #f8fafc;
     }
-    .record-mobile-card {
-      border: 1px solid #edf1f5;
-      border-radius: 16px;
-      background: #fff;
-      padding: 0.95rem;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    .record-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1rem;
+      align-items: stretch;
     }
-    .record-mobile-top {
+    .record-card {
+      border: 1px solid #e8eef5;
+      border-radius: 20px;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+      padding: 1rem;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
       display: flex;
-      gap: 0.85rem;
+      flex-direction: column;
+      gap: 0.95rem;
+      height: 100%;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+    .record-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+      border-color: #d9e8ff;
+    }
+    .record-card.row-dirty {
+      border-color: #b9d6ff;
+      box-shadow: 0 14px 32px rgba(13, 110, 253, 0.10);
+    }
+    .record-card-top {
+      display: flex;
+      gap: 1rem;
       align-items: flex-start;
     }
-    .record-mobile-thumb {
-      width: 64px;
-      height: 64px;
-      flex: 0 0 64px;
-      border-radius: 14px;
+    .record-card-thumb {
+      width: 92px;
+      height: 92px;
+      flex: 0 0 92px;
+      border-radius: 18px;
       object-fit: cover;
       border: 1px solid #e9ecef;
       background: #fff;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.7);
     }
-    .record-mobile-title {
-      font-size: 0.98rem;
-      font-weight: 600;
-      color: #1f2937;
+    .record-card-title {
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: #18212f;
       line-height: 1.35;
+      word-break: break-word;
       margin-bottom: 0.2rem;
     }
-    .record-mobile-subtitle {
-      font-size: 0.8rem;
-      color: #6b7280;
-      line-height: 1.4;
-    }
-    .record-mobile-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-      margin-top: 0.75rem;
-    }
-    .record-mobile-spec,
-    .record-mobile-price,
-    .record-mobile-actions,
-    .record-mobile-status {
-      margin-top: 0.85rem;
-    }
-    .record-mobile-spec {
+    .record-card-subtitle {
       font-size: 0.84rem;
-      color: #4b5563;
-      background: #f8fafc;
-      border: 1px solid #eef2f7;
-      border-radius: 12px;
-      padding: 0.75rem;
-      line-height: 1.5;
+      color: #64748b;
+      line-height: 1.45;
     }
-    .record-mobile-price {
+    .record-card-badges {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.35rem;
+      margin-top: 0.7rem;
+    }
+    .record-card-badges .badge {
+      display: block;
+      width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+      font-size: 0.69rem;
+      padding: 0.34rem 0.48rem;
+    }
+    .record-card-price {
       display: flex;
-      align-items: center;
+      align-items: baseline;
       justify-content: space-between;
       gap: 0.75rem;
-      font-size: 0.9rem;
+      padding: 0.85rem 0.95rem;
+      border-radius: 16px;
+      background: #f4fbf7;
+      border: 1px solid #dbeedd;
     }
-    .record-mobile-price-value {
-      font-size: 1.1rem;
-      font-weight: 700;
+    .record-card-price-label {
+      font-size: 0.82rem;
+      color: #6b7280;
+    }
+    .record-card-price-value {
+      font-size: 1.35rem;
+      font-weight: 800;
       color: #198754;
+      white-space: nowrap;
     }
-    .record-mobile-status {
-      border-top: 1px dashed #e5e7eb;
-      padding-top: 0.85rem;
+    .record-card-section {
+      border: 1px solid #edf2f7;
+      border-radius: 16px;
+      background: #ffffff;
+      padding: 0.9rem;
     }
-    .record-mobile-actions {
+    .record-card-section-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 0.55rem;
+    }
+    .record-card-spec-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.6rem;
+      gap: 0.7rem 0.9rem;
+    }
+    .record-card-spec-item {
+      min-width: 0;
+    }
+    .record-card-spec-label {
+      font-size: 0.76rem;
+      color: #94a3b8;
+      margin-bottom: 0.18rem;
+    }
+    .record-card-spec-value {
+      font-size: 0.9rem;
+      color: #1f2937;
+      font-weight: 600;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .record-card-meta-list {
+      display: grid;
+      gap: 0.55rem;
+    }
+    .record-card-meta-row {
+      display: grid;
+      grid-template-columns: 90px minmax(0, 1fr);
+      gap: 0.65rem;
+      align-items: start;
+    }
+    .record-card-meta-label {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+    .record-card-meta-value {
+      font-size: 0.88rem;
+      color: #334155;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .record-card-status {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+      align-items: start;
+    }
+    .record-card-status .form-check {
+      margin: 0;
+      min-height: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.7rem;
+      border: 1px solid #eef2f7;
+      border-radius: 999px;
+      background: #fcfdff;
+      transition: border-color 0.18s ease, background-color 0.18s ease;
+    }
+    .record-card-status .form-check-input {
+      margin: 0;
+      width: 0.95rem;
+      height: 0.95rem;
+      border-color: #cbd5e1;
+      box-shadow: none;
+      flex: 0 0 auto;
+    }
+    .record-card-status .form-check-input:checked {
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+    .record-card-status .form-check-label {
+      margin: 0;
+      font-size: 0.84rem;
+      font-weight: 500;
+      color: #64748b;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .record-card-status .form-check:has(.form-check-input:checked) {
+      border-color: #d9e8ff;
+      background: #f8fbff;
+    }
+    .record-card-save {
+      width: 100%;
+    }
+    .record-card-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.65rem;
+      margin-top: auto;
+    }
+    .record-card-action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      min-height: 40px;
+      padding: 0.55rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      background: #fff;
+      color: #1f2937;
+      border: 1px solid #e5e7eb;
+      transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    }
+    .record-card-action-btn:hover {
+      background: #f8fafc;
+      border-color: #d6deea;
+      color: #0f172a;
+    }
+    .record-card-action-btn.is-edit {
+      background: #fffdf7;
     }
     .admin-option-textarea {
       min-height: 150px;
       font-size: 0.92rem;
       line-height: 1.5;
     }
+    .selector-builder {
+      padding: 0.9rem;
+      border: 1px solid #e9eef5;
+      border-radius: 14px;
+      background: #f8fbff;
+    }
+    .selector-builder-hint {
+      font-size: 0.77rem;
+      color: #64748b;
+      margin-top: 0.55rem;
+    }
+    .is-hidden {
+      display: none;
+    }
+    .selector-builder-label {
+      font-size: 0.76rem;
+      color: #64748b;
+      margin-bottom: 0.35rem;
+      font-weight: 600;
+    }
+    .selector-readonly {
+      background: #fff;
+    }
+
     @media (max-width: 991.98px) {
       .navbar .container-fluid {
         gap: 0.75rem;
@@ -272,12 +436,41 @@
       .bulk-status-bar .btn {
         width: 100%;
       }
-      .records-table-wrap {
-        display: none;
+      .record-grid-wrap {
+        padding: 0.85rem;
       }
-      .records-mobile-list {
-        display: flex;
-        flex-direction: column;
+      .record-card-grid {
+        grid-template-columns: 1fr;
+        gap: 0.85rem;
+      }
+      .record-card {
+        border-radius: 18px;
+        padding: 0.9rem;
+      }
+      .record-card-top {
+        gap: 0.8rem;
+      }
+      .record-card-thumb {
+        width: 72px;
+        height: 72px;
+        flex-basis: 72px;
+      }
+      .record-card-title {
+        font-size: 0.98rem;
+      }
+      .record-card-price {
+        padding: 0.75rem 0.85rem;
+      }
+      .record-card-price-value {
+        font-size: 1.15rem;
+      }
+      .record-card-spec-grid,
+      .record-card-status,
+      .record-card-actions {
+        grid-template-columns: 1fr;
+      }
+      .record-card-meta-row {
+        grid-template-columns: 78px minmax(0, 1fr);
       }
       .card-body.p-0 #paginationContainer {
         padding-top: 0.5rem !important;
@@ -352,25 +545,9 @@
             <button type="button" id="btnSaveAllStatuses" class="btn btn-success rounded-pill px-3" onclick="saveAllStatusChanges()"><i class="fas fa-check me-1"></i> บันทึกที่เลือกทั้งหมด</button>
           </div>
         </div>
-        <div class="records-table-wrap">
-          <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-              <thead class="bg-light">
-                <tr>
-                  <th class="ps-4 py-3">รูปภาพ</th>
-                  <th style="min-width: 140px;">สถานะงาน</th>
-                  <th>ประเภท</th>
-                  <th>ยี่ห้อ / รุ่น</th>
-                  <th>สเปคหลัก</th>
-                  <th>ราคา</th>
-                  <th class="text-center">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody id="dataTableBody" class="bg-white"></tbody>
-            </table>
-          </div>
+        <div class="record-grid-wrap">
+          <div id="recordCardGrid" class="record-card-grid"></div>
         </div>
-        <div id="mobileRecordList" class="records-mobile-list"></div>
         <div id="noDataMessage" class="text-center p-5 text-muted" style="display:none;"><i class="fas fa-inbox fa-3x mb-3 text-light"></i><br>ไม่พบข้อมูล</div>
         <div id="paginationContainer" class="p-3 border-top d-flex justify-content-center"></div>
       </div>
@@ -405,11 +582,33 @@
                 </select>
               </div>
               <div class="col-md-4"><label class="form-label small text-muted">รุ่น <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="model" required></div>
-              <div class="col-md-4"><label class="form-label small text-muted">CPU <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="cpu" required></div>
-              <div class="col-md-4"><label class="form-label small text-muted">RAM <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="ram" required></div>
-              <div class="col-md-4"><label class="form-label small text-muted">Storage <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="storage" required></div>
-              <div class="col-md-6"><label class="form-label small text-muted">Display / Size <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="display" required></div>
+              <div class="col-md-4" id="cpuFieldWrap"><label class="form-label small text-muted">CPU <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="cpu" required></div>
+              <div class="col-md-4" id="ramFieldWrap"><label class="form-label small text-muted">RAM <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="ram" list="ramOptionsList" autocomplete="off" required></div>
+              <div class="col-md-4" id="storageFieldWrap"><label class="form-label small text-muted">Storage <span class="text-danger">*</span></label><input type="text" class="form-control rounded-3" id="storage" list="storageOptionsList" autocomplete="off" required></div>
+              <div class="col-md-6" id="displayFieldWrap">
+                <label class="form-label small text-muted">Display / Size <span class="text-danger">*</span></label>
+                <div id="displayBuilder" class="selector-builder">
+                  <div class="row g-2">
+                    <div class="col-md-4 is-hidden" id="displayMonitorBrandWrap">
+                      <label class="selector-builder-label">ยี่ห้อจอ</label>
+                      <input type="text" class="form-control rounded-3" id="displayMonitorBrand" list="monitorBrandOptionsList" autocomplete="off">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="selector-builder-label">ขนาดจอ</label>
+                      <input type="text" class="form-control rounded-3" id="displaySizeInput" list="displaySizeOptionsList" autocomplete="off">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="selector-builder-label">Tag เพิ่มเติม</label>
+                      <input type="text" class="form-control rounded-3" id="displayTagInput" list="displayTagOptionsList" autocomplete="off">
+                    </div>
+                    <div class="col-12 selector-builder-hint">ระบบจะประกอบค่าหน้าจอให้อัตโนมัติจากข้อมูลด้านบน</div>
+                    <input type="hidden" id="display" autocomplete="off">
+                  </div>
+                </div>
+              </div>
+
               <div class="col-md-6"><label class="form-label small text-muted">ราคา <span class="text-danger">*</span></label><input type="number" class="form-control rounded-3" id="price" required></div>
+
               <div class="col-12">
                 <label class="form-label small text-muted fw-bold">คุณสมบัติเพิ่มเติม</label>
                 <div class="card p-3 bg-light border-0">
@@ -424,6 +623,11 @@
               </div>
             </div>
           </form>
+          <datalist id="ramOptionsList"></datalist>
+          <datalist id="storageOptionsList"></datalist>
+          <datalist id="displaySizeOptionsList"></datalist>
+          <datalist id="monitorBrandOptionsList"></datalist>
+          <datalist id="displayTagOptionsList"></datalist>
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">ยกเลิก</button>
@@ -600,6 +804,7 @@
                       <label class="settings-grid-label">ประเภท</label>
                       <textarea id="settingsTypeOptions" class="form-control rounded-3 admin-option-textarea" placeholder="PC&#10;Notebook&#10;All in One"></textarea>
                     </div>
+
                     <div class="col-12 col-lg-4">
                       <label class="settings-grid-label">ยี่ห้อ</label>
                       <textarea id="settingsBrandOptions" class="form-control rounded-3 admin-option-textarea" placeholder="Dell&#10;HP&#10;Lenovo"></textarea>
@@ -607,6 +812,26 @@
                     <div class="col-12 col-lg-4">
                       <label class="settings-grid-label">คุณสมบัติเพิ่มเติม</label>
                       <textarea id="settingsFeatureOptions" class="form-control rounded-3 admin-option-textarea" placeholder="License Windows&#10;KB มีไฟ&#10;DVD-RW"></textarea>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                      <label class="settings-grid-label">RAM</label>
+                      <textarea id="settingsRamOptions" class="form-control rounded-3 admin-option-textarea" placeholder="4 GB&#10;8 GB&#10;16 GB"></textarea>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                      <label class="settings-grid-label">Storage</label>
+                      <textarea id="settingsStorageOptions" class="form-control rounded-3 admin-option-textarea" placeholder="SSD 256 GB&#10;M.2 512 GB&#10;SSD 256 GB + HDD 1 TB"></textarea>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                      <label class="settings-grid-label">Display Size</label>
+                      <textarea id="settingsDisplaySizeOptions" class="form-control rounded-3 admin-option-textarea" placeholder="14 นิ้ว&#10;15.6 นิ้ว&#10;24 นิ้ว"></textarea>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                      <label class="settings-grid-label">Monitor Brand</label>
+                      <textarea id="settingsMonitorBrandOptions" class="form-control rounded-3 admin-option-textarea" placeholder="Dell&#10;Lenovo&#10;HP"></textarea>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                      <label class="settings-grid-label">Display Tag</label>
+                      <textarea id="settingsDisplayTagOptions" class="form-control rounded-3 admin-option-textarea" placeholder="#ไร้ขอบ&#10;#จอโค้ง&#10;#Touchscreen"></textarea>
                     </div>
                   </div>
                 </div>
@@ -624,7 +849,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="app-config.js"></script>
-  <script src="app.js"></script>
+  <script src="app-config.js?v=20260319-1"></script>
+  <script src="app.js?v=20260319-1"></script>
 </body>
 </html>

@@ -30,6 +30,11 @@ function createDefaultRuntimeSettings() {
     typeOptions: ["PC", "Notebook", "All in One", "Monitor"],
     brandOptions: ["Dell", "HP", "Lenovo", "Acer", "Asus", "Toshiba", "Fujitsu", "MSI", "Hisense"],
     featureOptions: ["License Windows", "KB มีไฟ", "สแกนนิ้ว", "สแกนหน้า", "Card Wi-Fi", "DVD-RW", "ใส่ Sim ได้"],
+    ramOptions: ["4 GB", "8 GB", "16 GB", "32 GB", "8 GB + 8 GB", "16 GB + 16 GB"],
+    storageOptions: ["SSD 128 GB", "SSD 256 GB", "SSD 512 GB", "SSD 1 TB", "M.2 256 GB", "M.2 512 GB", "M.2 1 TB", "SSD 256 GB + HDD 500 GB", "SSD 256 GB + HDD 1 TB", "SSD 512 GB + HDD 1 TB"],
+    displaySizeOptions: ["14 นิ้ว", "15.6 นิ้ว", "20 นิ้ว", "21.5 นิ้ว", "22 นิ้ว", "23.8 นิ้ว", "24 นิ้ว", "27 นิ้ว"],
+    monitorBrandOptions: ["Dell", "Lenovo", "HP", "Acer", "Asus", "Samsung", "LG", "AOC", "MSI"],
+    displayTagOptions: ["#ไร้ขอบ", "#จอโค้ง", "#Touchscreen"],
     featureBulkStatusEnabled: true,
     featureSubmitLockEnabled: true,
     featureDedupeEnabled: true,
@@ -118,6 +123,193 @@ function parseAdminListInput(value) {
     .filter((item, index, array) => array.indexOf(item) === index);
 }
 
+function renderDatalistOptions(listId, options) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+  const normalizedOptions = Array.isArray(options) ? options.filter(Boolean) : [];
+  list.innerHTML = normalizedOptions.map((option) => `<option value="${escapeHtml(option)}"></option>`).join("");
+}
+
+function normalizeProductType(typeValue) {
+  return String(typeValue || "").trim().toLowerCase();
+}
+
+function displayUsesMonitorBrand(typeValue) {
+  const normalizedType = normalizeProductType(typeValue);
+  return normalizedType === "pc";
+}
+
+function displayValueMayContainMonitorBrand(typeValue) {
+  const normalizedType = normalizeProductType(typeValue);
+  return normalizedType === "pc" || normalizedType === "monitor";
+}
+
+function getVisibleSpecFields(typeValue) {
+  const normalizedType = normalizeProductType(typeValue);
+  return {
+    cpu: normalizedType !== "printer" && normalizedType !== "monitor",
+    ram: normalizedType !== "printer" && normalizedType !== "monitor",
+    storage: normalizedType !== "printer" && normalizedType !== "monitor",
+    display: normalizedType !== "printer",
+  };
+}
+
+function setFieldVisibility(wrapperId, inputId, isVisible, { clearOnHide = true } = {}) {
+  const wrapper = document.getElementById(wrapperId);
+  const input = document.getElementById(inputId);
+  if (!wrapper || !input) return;
+  wrapper.classList.toggle("is-hidden", !isVisible);
+  input.required = isVisible;
+  if (!isVisible && clearOnHide) {
+    input.value = "";
+  }
+}
+
+function getDisplayBuilderElements() {
+  return {
+    typeInput: document.getElementById("type"),
+    displayInput: document.getElementById("display"),
+    sizeInput: document.getElementById("displaySizeInput"),
+    tagInput: document.getElementById("displayTagInput"),
+    monitorBrandInput: document.getElementById("displayMonitorBrand"),
+    monitorBrandWrap: document.getElementById("displayMonitorBrandWrap"),
+  };
+}
+
+function updateDisplayBuilderVisibility() {
+  const { typeInput, monitorBrandWrap, monitorBrandInput } = getDisplayBuilderElements();
+  if (!typeInput || !monitorBrandWrap || !monitorBrandInput) return;
+  const shouldShowMonitorBrand = displayUsesMonitorBrand(typeInput.value);
+  monitorBrandWrap.classList.toggle("is-hidden", !shouldShowMonitorBrand);
+  if (!shouldShowMonitorBrand) {
+    monitorBrandInput.value = "";
+  }
+}
+
+function updateSpecFieldVisibility() {
+  const typeValue = document.getElementById("type")?.value || "";
+  const visibleFields = getVisibleSpecFields(typeValue);
+  setFieldVisibility("cpuFieldWrap", "cpu", visibleFields.cpu);
+  setFieldVisibility("ramFieldWrap", "ram", visibleFields.ram);
+  setFieldVisibility("storageFieldWrap", "storage", visibleFields.storage);
+  setFieldVisibility("displayFieldWrap", "display", visibleFields.display);
+
+  if (!visibleFields.display) {
+    const { displayInput, sizeInput, tagInput, monitorBrandInput } = getDisplayBuilderElements();
+    if (displayInput) displayInput.value = "";
+    if (sizeInput) sizeInput.value = "";
+    if (tagInput) tagInput.value = "";
+    if (monitorBrandInput) monitorBrandInput.value = "";
+  }
+}
+
+function syncDisplayValueFromBuilder() {
+  const { typeInput, displayInput, sizeInput, tagInput, monitorBrandInput } = getDisplayBuilderElements();
+  if (!typeInput || !displayInput || !sizeInput || !tagInput || !monitorBrandInput) return;
+  displayInput.value = buildDisplayValue(typeInput.value);
+}
+
+function buildDisplayValue(typeValue = "") {
+  const { sizeInput, tagInput, monitorBrandInput } = getDisplayBuilderElements();
+  if (!sizeInput || !tagInput || !monitorBrandInput) return "";
+  const parts = [];
+  if (displayUsesMonitorBrand(typeValue) && monitorBrandInput.value.trim()) {
+    parts.push(monitorBrandInput.value.trim());
+  }
+  if (sizeInput.value.trim()) {
+    parts.push(sizeInput.value.trim());
+  }
+  let nextValue = parts.join(" ").trim();
+  if (tagInput.value.trim()) {
+    nextValue = `${nextValue}${nextValue ? " " : ""}${tagInput.value.trim()}`;
+  }
+  return nextValue;
+}
+
+function getTrimmedFieldValue(id) {
+  return String(document.getElementById(id)?.value || "").trim();
+}
+
+function getMissingRequiredFields(typeValue) {
+  const visibleFields = getVisibleSpecFields(typeValue);
+  const missing = [];
+  const fieldLabels = {
+    type: "ประเภท",
+    brand: "ยี่ห้อ",
+    model: "รุ่น",
+    cpu: "CPU",
+    ram: "RAM",
+    storage: "Storage",
+    display: "Display / Size",
+    price: "ราคา",
+  };
+
+  if (!getTrimmedFieldValue("type")) missing.push(fieldLabels.type);
+  if (!getTrimmedFieldValue("brand")) missing.push(fieldLabels.brand);
+  if (!getTrimmedFieldValue("model")) missing.push(fieldLabels.model);
+  if (visibleFields.cpu && !getTrimmedFieldValue("cpu")) missing.push(fieldLabels.cpu);
+  if (visibleFields.ram && !getTrimmedFieldValue("ram")) missing.push(fieldLabels.ram);
+  if (visibleFields.storage && !getTrimmedFieldValue("storage")) missing.push(fieldLabels.storage);
+  if (visibleFields.display && !getTrimmedFieldValue("display")) missing.push(fieldLabels.display);
+  if (!getTrimmedFieldValue("price")) missing.push(fieldLabels.price);
+
+  return missing;
+}
+
+function parseDisplayValue(value, typeValue) {
+  const result = {
+    monitorBrand: "",
+    size: "",
+    tag: "",
+  };
+  let baseValue = String(value || "").trim();
+  if (!baseValue) return result;
+
+  const tagMatch = [...runtimeSettings.displayTagOptions]
+    .sort((a, b) => b.length - a.length)
+    .find((option) => baseValue === option || baseValue.endsWith(` ${option}`));
+
+  if (tagMatch) {
+    result.tag = tagMatch;
+    baseValue = baseValue === tagMatch ? "" : baseValue.slice(0, baseValue.length - tagMatch.length).trim();
+  }
+
+  if (displayValueMayContainMonitorBrand(typeValue)) {
+    const matchedBrand = [...runtimeSettings.monitorBrandOptions]
+      .sort((a, b) => b.length - a.length)
+      .find((option) => baseValue === option || baseValue.startsWith(`${option} `));
+    if (matchedBrand) {
+      result.monitorBrand = matchedBrand;
+      result.size = baseValue === matchedBrand ? "" : baseValue.slice(matchedBrand.length).trim();
+      return result;
+    }
+  }
+
+  result.size = baseValue;
+  return result;
+}
+
+function populateDisplayBuilderFromValue(value = "", forcedType = "") {
+  const { typeInput, displayInput, sizeInput, tagInput, monitorBrandInput } = getDisplayBuilderElements();
+  if (!typeInput || !displayInput || !sizeInput || !tagInput || !monitorBrandInput) return;
+  const activeType = forcedType || typeInput.value;
+  const parsed = parseDisplayValue(value, activeType);
+  monitorBrandInput.value = parsed.monitorBrand;
+  sizeInput.value = parsed.size;
+  tagInput.value = parsed.tag;
+  displayInput.value = value || "";
+  updateDisplayBuilderVisibility();
+  if (!value) {
+    syncDisplayValueFromBuilder();
+  }
+}
+
+function handleTypeChange() {
+  updateSpecFieldVisibility();
+  updateDisplayBuilderVisibility();
+  syncDisplayValueFromBuilder();
+}
+
 function renderSelectOptions(selectId, options, placeholder, selectedValue = "", includeAllOption = false, allLabel = "ทั้งหมด") {
   const select = document.getElementById(selectId);
   if (!select) return;
@@ -158,12 +350,18 @@ function renderFeatureCheckboxes(selectedValues = []) {
 }
 
 function renderRuntimeOptionControls() {
-  renderSelectOptions("type", runtimeSettings.typeOptions, "เลือกประเภท");
-  renderSelectOptions("brand", runtimeSettings.brandOptions, "เลือกยี่ห้อ");
+  renderSelectOptions("type", runtimeSettings.typeOptions, "เลือกประเภท", document.getElementById("type")?.value || runtimeSettings.defaultType || "");
+  renderSelectOptions("brand", runtimeSettings.brandOptions, "เลือกยี่ห้อ", document.getElementById("brand")?.value || runtimeSettings.defaultBrand || "");
   renderSelectOptions("filterType", runtimeSettings.typeOptions, "ทุกประเภท", document.getElementById("filterType")?.value || "All", true, "ทุกประเภท");
   renderSelectOptions("settingsDefaultType", runtimeSettings.typeOptions, "ไม่กำหนด", adminSettingsState?.defaultType || "");
   renderSelectOptions("settingsDefaultBrand", runtimeSettings.brandOptions, "ไม่กำหนด", adminSettingsState?.defaultBrand || "");
+  renderDatalistOptions("ramOptionsList", runtimeSettings.ramOptions);
+  renderDatalistOptions("storageOptionsList", runtimeSettings.storageOptions);
+  renderDatalistOptions("displaySizeOptionsList", runtimeSettings.displaySizeOptions);
+  renderDatalistOptions("monitorBrandOptionsList", runtimeSettings.monitorBrandOptions);
+  renderDatalistOptions("displayTagOptionsList", runtimeSettings.displayTagOptions);
   renderFeatureCheckboxes(Array.from(document.querySelectorAll(".feature-check:checked")).map((cb) => cb.value));
+  updateDisplayBuilderVisibility();
 }
 
 function setLoadingState(isVisible, text = "กำลังประมวลผล...", showProgress = false) {
@@ -296,6 +494,9 @@ async function buildRecordFormData() {
   const featureChecks = Array.from(document.querySelectorAll(".feature-check:checked")).map((cb) => cb.value);
   const formData = new FormData();
   const recId = document.getElementById("recId").value;
+  const displayValue = buildDisplayValue(document.getElementById("type").value) || getTrimmedFieldValue("display");
+
+  document.getElementById("display").value = displayValue;
 
   formData.append("recId", recId);
   formData.append("currentDate", document.getElementById("currentDate").value);
@@ -306,7 +507,7 @@ async function buildRecordFormData() {
   formData.append("cpu", document.getElementById("cpu").value);
   formData.append("ram", document.getElementById("ram").value);
   formData.append("storage", document.getElementById("storage").value);
-  formData.append("display", document.getElementById("display").value);
+  formData.append("display", displayValue);
   formData.append("price", document.getElementById("price").value);
   formData.append("features", JSON.stringify(featureChecks));
   formData.append("remarks", document.getElementById("remarks").value);
@@ -366,11 +567,12 @@ function submitRecordWithProgress(formData, totalFiles) {
 }
 
 async function submitData() {
-  const requiredIds = ["type", "brand", "model", "cpu", "ram", "storage", "display", "price"];
-  const missingRequired = requiredIds.some((id) => !document.getElementById(id).value);
+  const typeValue = getTrimmedFieldValue("type");
+  document.getElementById("display").value = buildDisplayValue(typeValue) || getTrimmedFieldValue("display");
+  const missingFields = getMissingRequiredFields(typeValue);
 
-  if (missingRequired) {
-    Swal.fire("แจ้งเตือน", "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน (*)", "warning");
+  if (missingFields.length > 0) {
+    Swal.fire("แจ้งเตือน", `กรุณากรอกข้อมูลให้ครบ: ${missingFields.join(", ")}`, "warning");
     return;
   }
 
@@ -421,10 +623,9 @@ function getResolvedStatus(item) {
 }
 
 function renderPage() {
-  const tbody = document.getElementById("dataTableBody");
-  const mobileList = document.getElementById("mobileRecordList");
-  tbody.innerHTML = "";
-  mobileList.innerHTML = "";
+  const cardGrid = document.getElementById("recordCardGrid");
+  if (!cardGrid) return;
+  cardGrid.innerHTML = "";
 
   if (!currentDataList || currentDataList.length === 0) {
     document.getElementById("noDataMessage").style.display = "block";
@@ -445,85 +646,97 @@ function renderPage() {
       const firstImg = item.imageLinks.split(",")[0];
       imageSrc = firstImg;
     }
-    const imgHtml = `<img src="${escapeHtml(imageSrc)}" class="rounded-3 border" style="width:50px;height:50px;object-fit:cover;" onerror="this.src='${placeholderImg}'">`;
+    const safeId = escapeHtml(item.id);
+    const safeType = escapeHtml(item.type || "-");
+    const safeDate = escapeHtml(item.date || "-");
+    const safeBrand = escapeHtml(item.brand || "-");
+    const safeModel = escapeHtml(item.model || "-");
+    const safeCpu = escapeHtml(item.cpu || "-");
+    const safeRam = escapeHtml(item.ram || "-");
+    const safeStorage = escapeHtml(item.storage || "-");
+    const safeDisplay = escapeHtml(item.display || "-");
+    const safeFeatures = escapeHtml(item.features || "-");
+    const safeRemarks = escapeHtml(item.remarks || "-");
+    const priceLabel = Number(item.price).toLocaleString();
 
-    const tr = document.createElement("tr");
-    tr.id = `row_${item.id}`;
-    if (resolved.isDirty) {
-      tr.classList.add("row-dirty");
-    }
-
-    tr.innerHTML = `
-      <td class="ps-4">${imgHtml}</td>
-      <td>
-        <div class="d-flex flex-column gap-1">
-          <div class="form-check mb-0">
-            <input class="form-check-input status-check" type="checkbox" id="chk_img_${escapeHtml(item.id)}" ${resolved.statusImage ? "checked" : ""} ${item.statusImage ? "disabled" : ""} onchange="toggleSaveBtn('${escapeHtml(item.id)}')">
-            <label class="form-check-label small text-muted" for="chk_img_${escapeHtml(item.id)}">ทำรูปแล้ว</label>
-          </div>
-          <div class="form-check mb-0">
-            <input class="form-check-input status-check" type="checkbox" id="chk_post_${escapeHtml(item.id)}" ${resolved.statusPosted ? "checked" : ""} ${item.statusPosted ? "disabled" : ""} onchange="toggleSaveBtn('${escapeHtml(item.id)}')">
-            <label class="form-check-label small text-muted" for="chk_post_${escapeHtml(item.id)}">โพสต์แล้ว</label>
-          </div>
-        </div>
-        <button id="btn_save_status_${escapeHtml(item.id)}" class="btn btn-sm btn-success rounded-pill mt-2 w-100 py-0" style="font-size:11px; display:${(!runtimeSettings.featureBulkStatusEnabled && resolved.isDirty) ? "block" : "none"};" onclick="saveStatus('${escapeHtml(item.id)}')" ${resolved.isDirty ? "" : "disabled"}>
-          <i class="fas fa-check me-1"></i> บันทึก
-        </button>
-      </td>
-      <td><span class="badge bg-light text-dark border">${escapeHtml(item.type)}</span></td>
-      <td><div class="fw-bold text-dark">${escapeHtml(item.brand)}</div><small class="text-muted">${escapeHtml(item.model)}</small></td>
-      <td><small class="text-muted text-truncate d-block" style="max-width:180px;">${escapeHtml(item.cpu)} / ${escapeHtml(item.ram)} / ${escapeHtml(item.storage)}</small></td>
-      <td class="text-success fw-bold">${Number(item.price).toLocaleString()}</td>
-      <td class="text-center"><button class="btn btn-sm btn-light text-primary border rounded-circle" style="width:32px;height:32px;" onclick="viewDetails('${escapeHtml(item.id)}')"><i class="fas fa-eye"></i></button><button class="btn btn-sm btn-light text-warning border rounded-circle ms-1" style="width:32px;height:32px;" onclick="editData('${escapeHtml(item.id)}')"><i class="fas fa-pen"></i></button></td>
-    `;
-    tbody.appendChild(tr);
-
-    const mobileCard = document.createElement("div");
-    mobileCard.className = `record-mobile-card${resolved.isDirty ? " row-dirty" : ""}`;
-    mobileCard.innerHTML = `
-      <div class="record-mobile-top">
-        <img src="${escapeHtml(imageSrc)}" class="record-mobile-thumb" onerror="this.src='${placeholderImg}'">
-        <div class="flex-grow-1">
-          <div class="record-mobile-title">${escapeHtml(item.brand)} ${escapeHtml(item.model)}</div>
-          <div class="record-mobile-subtitle">${escapeHtml(item.type)} · ${escapeHtml(item.date || "-")}</div>
-          <div class="record-mobile-badges">
-            <span class="badge bg-light text-dark border">${escapeHtml(item.type)}</span>
+    const card = document.createElement("article");
+    card.id = `row_${item.id}`;
+    card.className = `record-card${resolved.isDirty ? " row-dirty" : ""}`;
+    card.innerHTML = `
+      <div class="record-card-top">
+        <img src="${escapeHtml(imageSrc)}" class="record-card-thumb" onerror="this.src='${placeholderImg}'">
+        <div class="flex-grow-1 min-w-0">
+          <div class="record-card-title">${safeBrand} ${safeModel}</div>
+          <div class="record-card-subtitle">${safeType} · รับเข้า ${safeDate}</div>
+          <div class="record-card-badges">
+            <span class="badge bg-light text-dark border">${safeType}</span>
             <span class="badge ${resolved.statusImage ? "bg-primary-subtle text-primary" : "bg-secondary-subtle text-secondary"} border">${resolved.statusImage ? "ทำรูปแล้ว" : "รอทำรูป"}</span>
             <span class="badge ${resolved.statusPosted ? "bg-success-subtle text-success" : "bg-secondary-subtle text-secondary"} border">${resolved.statusPosted ? "โพสต์แล้ว" : "รอโพสต์"}</span>
           </div>
         </div>
       </div>
-      <div class="record-mobile-spec">
-        <div><strong>CPU:</strong> ${escapeHtml(item.cpu || "-")}</div>
-        <div><strong>RAM:</strong> ${escapeHtml(item.ram || "-")}</div>
-        <div><strong>Storage:</strong> ${escapeHtml(item.storage || "-")}</div>
-        <div><strong>Display:</strong> ${escapeHtml(item.display || "-")}</div>
+      <div class="record-card-price">
+        <div>
+          <div class="record-card-price-label">ราคาขาย</div>
+        </div>
+        <div class="record-card-price-value">${priceLabel} บาท</div>
       </div>
-      <div class="record-mobile-price">
-        <span class="text-muted">ราคา</span>
-        <span class="record-mobile-price-value">${Number(item.price).toLocaleString()} บาท</span>
-      </div>
-      <div class="record-mobile-status">
-        <div class="d-flex flex-column gap-2">
-          <div class="form-check mb-0">
-            <input class="form-check-input status-check" type="checkbox" id="mobile_chk_img_${escapeHtml(item.id)}" ${resolved.statusImage ? "checked" : ""} ${item.statusImage ? "disabled" : ""} onchange="syncStatusToggle('${escapeHtml(item.id)}','image', this.checked)">
-            <label class="form-check-label small text-muted" for="mobile_chk_img_${escapeHtml(item.id)}">ทำรูปแล้ว</label>
+      <div class="record-card-section">
+        <div class="record-card-section-title">สเปคหลัก</div>
+        <div class="record-card-spec-grid">
+          <div class="record-card-spec-item">
+            <div class="record-card-spec-label">CPU</div>
+            <div class="record-card-spec-value">${safeCpu}</div>
           </div>
-          <div class="form-check mb-0">
-            <input class="form-check-input status-check" type="checkbox" id="mobile_chk_post_${escapeHtml(item.id)}" ${resolved.statusPosted ? "checked" : ""} ${item.statusPosted ? "disabled" : ""} onchange="syncStatusToggle('${escapeHtml(item.id)}','posted', this.checked)">
-            <label class="form-check-label small text-muted" for="mobile_chk_post_${escapeHtml(item.id)}">โพสต์แล้ว</label>
+          <div class="record-card-spec-item">
+            <div class="record-card-spec-label">RAM</div>
+            <div class="record-card-spec-value">${safeRam}</div>
           </div>
-          <button id="mobile_btn_save_status_${escapeHtml(item.id)}" class="btn btn-sm btn-success rounded-pill mt-2" style="display:${(!runtimeSettings.featureBulkStatusEnabled && resolved.isDirty) ? "block" : "none"};" onclick="saveStatus('${escapeHtml(item.id)}')" ${resolved.isDirty ? "" : "disabled"}>
-            <i class="fas fa-check me-1"></i> บันทึกสถานะ
-          </button>
+          <div class="record-card-spec-item">
+            <div class="record-card-spec-label">Storage</div>
+            <div class="record-card-spec-value">${safeStorage}</div>
+          </div>
+          <div class="record-card-spec-item">
+            <div class="record-card-spec-label">Display</div>
+            <div class="record-card-spec-value">${safeDisplay}</div>
+          </div>
         </div>
       </div>
-      <div class="record-mobile-actions">
-        <button class="btn btn-light border rounded-pill" onclick="viewDetails('${escapeHtml(item.id)}')"><i class="fas fa-eye me-1"></i> รายละเอียด</button>
-        <button class="btn btn-warning-subtle border rounded-pill" onclick="editData('${escapeHtml(item.id)}')"><i class="fas fa-pen me-1"></i> แก้ไข</button>
+      <div class="record-card-section">
+        <div class="record-card-section-title">รายละเอียดเพิ่มเติม</div>
+        <div class="record-card-meta-list">
+          <div class="record-card-meta-row">
+            <div class="record-card-meta-label">คุณสมบัติ</div>
+            <div class="record-card-meta-value">${safeFeatures}</div>
+          </div>
+          <div class="record-card-meta-row">
+            <div class="record-card-meta-label">หมายเหตุ</div>
+            <div class="record-card-meta-value">${safeRemarks}</div>
+          </div>
+        </div>
+      </div>
+      <div class="record-card-section">
+        <div class="record-card-section-title">สถานะงาน</div>
+        <div class="record-card-status">
+          <div class="form-check">
+            <input class="form-check-input status-check" type="checkbox" id="chk_img_${safeId}" ${resolved.statusImage ? "checked" : ""} ${item.statusImage ? "disabled" : ""} onchange="toggleSaveBtn('${safeId}')">
+            <label class="form-check-label small text-muted" for="chk_img_${safeId}">ทำรูปแล้ว</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input status-check" type="checkbox" id="chk_post_${safeId}" ${resolved.statusPosted ? "checked" : ""} ${item.statusPosted ? "disabled" : ""} onchange="toggleSaveBtn('${safeId}')">
+            <label class="form-check-label small text-muted" for="chk_post_${safeId}">โพสต์แล้ว</label>
+          </div>
+        </div>
+        <button id="btn_save_status_${safeId}" class="btn btn-success rounded-pill mt-3 record-card-save" style="display:${(!runtimeSettings.featureBulkStatusEnabled && resolved.isDirty) ? "block" : "none"};" onclick="saveStatus('${safeId}')" ${resolved.isDirty ? "" : "disabled"}>
+          <i class="fas fa-check me-1"></i> บันทึกสถานะ
+        </button>
+      </div>
+      <div class="record-card-actions">
+        <button class="record-card-action-btn" onclick="viewDetails('${safeId}')"><i class="fas fa-eye"></i><span>ดู</span></button>
+        <button class="record-card-action-btn is-edit" onclick="editData('${safeId}')"><i class="fas fa-pen"></i><span>แก้ไข</span></button>
       </div>
     `;
-    mobileList.appendChild(mobileCard);
+    cardGrid.appendChild(card);
   });
 
   renderPaginationControls();
@@ -764,6 +977,8 @@ function applyFormDefaults() {
       brandSelect.value = runtimeSettings.defaultBrand;
     }
   }
+  updateSpecFieldVisibility();
+  populateDisplayBuilderFromValue("", document.getElementById("type")?.value || runtimeSettings.defaultType || "");
 }
 
 function resetFormState() {
@@ -780,6 +995,10 @@ function resetFormState() {
   currentEditPassword = "";
   renderPreview();
   applyFormDefaults();
+  document.getElementById("ram").value = "";
+  document.getElementById("storage").value = "";
+  document.getElementById("display").value = "";
+  populateDisplayBuilderFromValue("", document.getElementById("type")?.value || runtimeSettings.defaultType || "");
 }
 
 function openAddModal() {
@@ -819,6 +1038,8 @@ async function editData(id) {
     document.getElementById("ram").value = item.ram;
     document.getElementById("storage").value = item.storage;
     document.getElementById("display").value = item.display;
+    updateSpecFieldVisibility();
+    populateDisplayBuilderFromValue(item.display, item.type);
     document.getElementById("price").value = item.price;
     document.getElementById("remarks").value = item.remarks;
     document.getElementById("currentFolderLink").value = item.folderLink;
@@ -968,6 +1189,11 @@ function populateAdminSettingsForm() {
   document.getElementById("settingsTypeOptions").value = (adminSettingsState.typeOptions || []).join("\n");
   document.getElementById("settingsBrandOptions").value = (adminSettingsState.brandOptions || []).join("\n");
   document.getElementById("settingsFeatureOptions").value = (adminSettingsState.featureOptions || []).join("\n");
+  document.getElementById("settingsRamOptions").value = (adminSettingsState.ramOptions || []).join("\n");
+  document.getElementById("settingsStorageOptions").value = (adminSettingsState.storageOptions || []).join("\n");
+  document.getElementById("settingsDisplaySizeOptions").value = (adminSettingsState.displaySizeOptions || []).join("\n");
+  document.getElementById("settingsMonitorBrandOptions").value = (adminSettingsState.monitorBrandOptions || []).join("\n");
+  document.getElementById("settingsDisplayTagOptions").value = (adminSettingsState.displayTagOptions || []).join("\n");
   document.getElementById("settingsFeatureBulkStatusEnabled").checked = Boolean(adminSettingsState.featureBulkStatusEnabled);
   document.getElementById("settingsFeatureSubmitLockEnabled").checked = Boolean(adminSettingsState.featureSubmitLockEnabled);
   document.getElementById("settingsFeatureDedupeEnabled").checked = Boolean(adminSettingsState.featureDedupeEnabled);
@@ -1053,6 +1279,11 @@ async function saveAdminSettings() {
   adminSettingsState.typeOptions = parseAdminListInput(document.getElementById("settingsTypeOptions").value);
   adminSettingsState.brandOptions = parseAdminListInput(document.getElementById("settingsBrandOptions").value);
   adminSettingsState.featureOptions = parseAdminListInput(document.getElementById("settingsFeatureOptions").value);
+  adminSettingsState.ramOptions = parseAdminListInput(document.getElementById("settingsRamOptions").value);
+  adminSettingsState.storageOptions = parseAdminListInput(document.getElementById("settingsStorageOptions").value);
+  adminSettingsState.displaySizeOptions = parseAdminListInput(document.getElementById("settingsDisplaySizeOptions").value);
+  adminSettingsState.monitorBrandOptions = parseAdminListInput(document.getElementById("settingsMonitorBrandOptions").value);
+  adminSettingsState.displayTagOptions = parseAdminListInput(document.getElementById("settingsDisplayTagOptions").value);
   adminSettingsState.featureBulkStatusEnabled = document.getElementById("settingsFeatureBulkStatusEnabled").checked;
   adminSettingsState.featureSubmitLockEnabled = document.getElementById("settingsFeatureSubmitLockEnabled").checked;
   adminSettingsState.featureDedupeEnabled = document.getElementById("settingsFeatureDedupeEnabled").checked;
@@ -1072,6 +1303,10 @@ async function saveAdminSettings() {
   }
   if (adminSettingsState.defaultBrand && !adminSettingsState.brandOptions.includes(adminSettingsState.defaultBrand)) {
     Swal.fire("แจ้งเตือน", "ยี่ห้อตั้งต้นต้องอยู่ในรายการยี่ห้อ", "warning");
+    return;
+  }
+  if (adminSettingsState.ramOptions.length === 0 || adminSettingsState.storageOptions.length === 0 || adminSettingsState.displaySizeOptions.length === 0 || adminSettingsState.monitorBrandOptions.length === 0) {
+    Swal.fire("แจ้งเตือน", "รายการ RAM, Storage, Display Size และ Monitor Brand ต้องมีอย่างน้อย 1 รายการ", "warning");
     return;
   }
 
@@ -1096,6 +1331,11 @@ async function saveAdminSettings() {
         typeOptions: adminSettingsState.typeOptions,
         brandOptions: adminSettingsState.brandOptions,
         featureOptions: adminSettingsState.featureOptions,
+        ramOptions: adminSettingsState.ramOptions,
+        storageOptions: adminSettingsState.storageOptions,
+        displaySizeOptions: adminSettingsState.displaySizeOptions,
+        monitorBrandOptions: adminSettingsState.monitorBrandOptions,
+        displayTagOptions: adminSettingsState.displayTagOptions,
         featureBulkStatusEnabled: adminSettingsState.featureBulkStatusEnabled,
         featureSubmitLockEnabled: adminSettingsState.featureSubmitLockEnabled,
         featureDedupeEnabled: adminSettingsState.featureDedupeEnabled,
@@ -1119,6 +1359,11 @@ async function saveAdminSettings() {
       typeOptions: adminSettingsState.typeOptions,
       brandOptions: adminSettingsState.brandOptions,
       featureOptions: adminSettingsState.featureOptions,
+      ramOptions: adminSettingsState.ramOptions,
+      storageOptions: adminSettingsState.storageOptions,
+      displaySizeOptions: adminSettingsState.displaySizeOptions,
+      monitorBrandOptions: adminSettingsState.monitorBrandOptions,
+      displayTagOptions: adminSettingsState.displayTagOptions,
       featureBulkStatusEnabled: adminSettingsState.featureBulkStatusEnabled,
       featureSubmitLockEnabled: adminSettingsState.featureSubmitLockEnabled,
       featureDedupeEnabled: adminSettingsState.featureDedupeEnabled,
@@ -1150,6 +1395,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("filterType").addEventListener("change", filterData);
   document.getElementById("filterStatus").addEventListener("change", filterData);
   document.getElementById("fileInput").addEventListener("change", handleFileSelect);
+  document.getElementById("type").addEventListener("change", handleTypeChange);
+  document.getElementById("displayMonitorBrand").addEventListener("input", syncDisplayValueFromBuilder);
+  document.getElementById("displayMonitorBrand").addEventListener("change", syncDisplayValueFromBuilder);
+  document.getElementById("displaySizeInput").addEventListener("input", syncDisplayValueFromBuilder);
+  document.getElementById("displaySizeInput").addEventListener("change", syncDisplayValueFromBuilder);
+  document.getElementById("displayTagInput").addEventListener("input", syncDisplayValueFromBuilder);
+  document.getElementById("displayTagInput").addEventListener("change", syncDisplayValueFromBuilder);
+  document.getElementById("display").addEventListener("blur", () => populateDisplayBuilderFromValue(document.getElementById("display").value, document.getElementById("type").value));
   await loadRuntimeSettings();
   resetFormState();
   await loadData();

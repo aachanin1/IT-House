@@ -54,6 +54,11 @@ type AppSettingsRow = {
   type_options: unknown;
   brand_options: unknown;
   feature_options: unknown;
+  ram_options: unknown;
+  storage_options: unknown;
+  display_size_options: unknown;
+  monitor_brand_options: unknown;
+  display_tag_options: unknown;
   feature_bulk_status_enabled: boolean;
   feature_submit_lock_enabled: boolean;
   feature_dedupe_enabled: boolean;
@@ -80,6 +85,11 @@ type RuntimeSettings = {
   typeOptions: string[];
   brandOptions: string[];
   featureOptions: string[];
+  ramOptions: string[];
+  storageOptions: string[];
+  displaySizeOptions: string[];
+  monitorBrandOptions: string[];
+  displayTagOptions: string[];
   featureBulkStatusEnabled: boolean;
   featureSubmitLockEnabled: boolean;
   featureDedupeEnabled: boolean;
@@ -106,24 +116,37 @@ const frontendUrl = Deno.env.get("FRONTEND_PUBLIC_URL") || "";
 const defaultTypeOptions = ["PC", "Notebook", "All in One", "Monitor"];
 const defaultBrandOptions = ["Dell", "HP", "Lenovo", "Acer", "Asus", "Toshiba", "Fujitsu", "MSI", "Hisense"];
 const defaultFeatureOptions = ["License Windows", "KB มีไฟ", "สแกนนิ้ว", "สแกนหน้า", "Card Wi-Fi", "DVD-RW", "ใส่ Sim ได้"];
+const defaultRamOptions = ["4 GB", "8 GB", "16 GB", "32 GB", "8 GB + 8 GB", "16 GB + 16 GB"];
+const defaultStorageOptions = ["SSD 128 GB", "SSD 256 GB", "SSD 512 GB", "SSD 1 TB", "M.2 256 GB", "M.2 512 GB", "M.2 1 TB", "SSD 256 GB + HDD 500 GB", "SSD 256 GB + HDD 1 TB", "SSD 512 GB + HDD 1 TB"];
+const defaultDisplaySizeOptions = ["14 นิ้ว", "15.6 นิ้ว", "20 นิ้ว", "21.5 นิ้ว", "22 นิ้ว", "23.8 นิ้ว", "24 นิ้ว", "27 นิ้ว"];
+const defaultMonitorBrandOptions = ["Dell", "Lenovo", "HP", "Acer", "Asus", "Samsung", "LG", "AOC", "MSI"];
+const defaultDisplayTagOptions = ["#ไร้ขอบ", "#จอโค้ง", "#Touchscreen"];
+const localOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 
 function withDriveQuery(path: string) {
   return path.includes("?") ? `${path}&supportsAllDrives=true` : `${path}?supportsAllDrives=true`;
 }
 
-function corsHeaders() {
+function corsHeaders(request?: Request) {
+  const requestOrigin = request?.headers.get("origin") || "";
+  const allowedOrigins = [allowedOrigin, frontendUrl]
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const accessControlAllowOrigin = requestOrigin && (allowedOrigins.includes(requestOrigin) || localOriginPattern.test(requestOrigin))
+    ? requestOrigin
+    : "*";
   return {
-    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Origin": accessControlAllowOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
   };
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, status = 200, request?: Request) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders(),
+      ...corsHeaders(request),
       "Content-Type": "application/json; charset=utf-8",
     },
   });
@@ -221,18 +244,34 @@ function ensureAdminPasswordConfigured(settings: RuntimeSettings) {
   }
 }
 
-function ensureRequired(payload: RecordPayload) {
-  const requiredFields = [
-    payload.type,
-    payload.brand,
-    payload.model,
-    payload.cpu,
-    payload.ram,
-    payload.storage,
-    payload.display,
-    String(payload.price ?? ""),
-  ];
-  return requiredFields.every(value => String(value).trim() !== "");
+function normalizeProductType(typeValue: string) {
+  return String(typeValue || "").trim().toLowerCase();
+}
+
+function getMissingRequiredFields(payload: RecordPayload) {
+  const normalizedType = normalizeProductType(payload.type);
+  const missingFields: string[] = [];
+  const hasValue = (value: string | number) => String(value ?? "").trim() !== "";
+
+  if (!hasValue(payload.type)) missingFields.push("ประเภท");
+  if (!hasValue(payload.brand)) missingFields.push("ยี่ห้อ");
+  if (!hasValue(payload.model)) missingFields.push("รุ่น");
+
+  if (normalizedType !== "printer" && normalizedType !== "monitor" && !hasValue(payload.cpu)) {
+    missingFields.push("CPU");
+  }
+  if (normalizedType !== "printer" && normalizedType !== "monitor" && !hasValue(payload.ram)) {
+    missingFields.push("RAM");
+  }
+  if (normalizedType !== "printer" && normalizedType !== "monitor" && !hasValue(payload.storage)) {
+    missingFields.push("Storage");
+  }
+  if (normalizedType !== "printer" && !hasValue(payload.display)) {
+    missingFields.push("Display / Size");
+  }
+  if (!hasValue(String(payload.price ?? ""))) missingFields.push("ราคา");
+
+  return missingFields;
 }
 
 function getThaiDatePrefix(dateObj = new Date()) {
@@ -360,6 +399,11 @@ function mapRuntimeSettings(settingsRow: AppSettingsRow, presets: LineTargetPres
     typeOptions: normalizeStringArray(settingsRow.type_options, defaultTypeOptions),
     brandOptions: normalizeStringArray(settingsRow.brand_options, defaultBrandOptions),
     featureOptions: normalizeStringArray(settingsRow.feature_options, defaultFeatureOptions),
+    ramOptions: normalizeStringArray(settingsRow.ram_options, defaultRamOptions),
+    storageOptions: normalizeStringArray(settingsRow.storage_options, defaultStorageOptions),
+    displaySizeOptions: normalizeStringArray(settingsRow.display_size_options, defaultDisplaySizeOptions),
+    monitorBrandOptions: normalizeStringArray(settingsRow.monitor_brand_options, defaultMonitorBrandOptions),
+    displayTagOptions: normalizeStringArray(settingsRow.display_tag_options, defaultDisplayTagOptions),
     featureBulkStatusEnabled: Boolean(settingsRow.feature_bulk_status_enabled),
     featureSubmitLockEnabled: Boolean(settingsRow.feature_submit_lock_enabled),
     featureDedupeEnabled: Boolean(settingsRow.feature_dedupe_enabled),
@@ -404,7 +448,7 @@ async function ensureDefaultRuntimeSettings(supabase: ReturnType<typeof getSupab
 
   const { data: settingsRow, error: settingsError } = await supabase
     .from("app_settings")
-    .select("key, edit_password, admin_password, google_drive_parent_folder_id, line_notify_enabled, active_line_target_preset_id, line_message_header, line_message_separator, line_message_include_frontend_url, default_type, default_brand, type_options, brand_options, feature_options, feature_bulk_status_enabled, feature_submit_lock_enabled, feature_dedupe_enabled")
+    .select("key, edit_password, admin_password, google_drive_parent_folder_id, line_notify_enabled, active_line_target_preset_id, line_message_header, line_message_separator, line_message_include_frontend_url, default_type, default_brand, type_options, brand_options, feature_options, ram_options, storage_options, display_size_options, monitor_brand_options, display_tag_options, feature_bulk_status_enabled, feature_submit_lock_enabled, feature_dedupe_enabled")
     .eq("key", "main")
     .maybeSingle();
 
@@ -430,6 +474,11 @@ async function ensureDefaultRuntimeSettings(supabase: ReturnType<typeof getSupab
         type_options: defaultTypeOptions,
         brand_options: defaultBrandOptions,
         feature_options: defaultFeatureOptions,
+        ram_options: defaultRamOptions,
+        storage_options: defaultStorageOptions,
+        display_size_options: defaultDisplaySizeOptions,
+        monitor_brand_options: defaultMonitorBrandOptions,
+        display_tag_options: defaultDisplayTagOptions,
         feature_bulk_status_enabled: true,
         feature_submit_lock_enabled: true,
         feature_dedupe_enabled: true,
@@ -456,7 +505,7 @@ async function getRuntimeSettings(supabase: ReturnType<typeof getSupabaseClient>
   const [{ data: settingsRow, error: settingsError }, { data: presetRows, error: presetError }] = await Promise.all([
     supabase
       .from("app_settings")
-      .select("key, edit_password, admin_password, google_drive_parent_folder_id, line_notify_enabled, active_line_target_preset_id, line_message_header, line_message_separator, line_message_include_frontend_url, default_type, default_brand, type_options, brand_options, feature_options, feature_bulk_status_enabled, feature_submit_lock_enabled, feature_dedupe_enabled")
+      .select("key, edit_password, admin_password, google_drive_parent_folder_id, line_notify_enabled, active_line_target_preset_id, line_message_header, line_message_separator, line_message_include_frontend_url, default_type, default_brand, type_options, brand_options, feature_options, ram_options, storage_options, display_size_options, monitor_brand_options, display_tag_options, feature_bulk_status_enabled, feature_submit_lock_enabled, feature_dedupe_enabled")
       .eq("key", "main")
       .single(),
     supabase
@@ -489,6 +538,11 @@ function getPublicRuntimeSettings(settings: RuntimeSettings) {
     typeOptions: settings.typeOptions,
     brandOptions: settings.brandOptions,
     featureOptions: settings.featureOptions,
+    ramOptions: settings.ramOptions,
+    storageOptions: settings.storageOptions,
+    displaySizeOptions: settings.displaySizeOptions,
+    monitorBrandOptions: settings.monitorBrandOptions,
+    displayTagOptions: settings.displayTagOptions,
     featureBulkStatusEnabled: settings.featureBulkStatusEnabled,
     featureSubmitLockEnabled: settings.featureSubmitLockEnabled,
     featureDedupeEnabled: settings.featureDedupeEnabled,
@@ -643,7 +697,8 @@ async function ensureDriveFolder(payload: RecordPayload, settings: RuntimeSettin
       prefix = currentPrefix;
     }
   }
-  const desiredName = `${prefix}-${payload.brand} ${payload.model} ${payload.cpu}`.trim();
+  const nameParts = [payload.brand, payload.model, payload.cpu].map((value) => String(value || "").trim()).filter(Boolean);
+  const desiredName = `${prefix}-${nameParts.join(" ")}`.trim();
 
   if (existingFolderId) {
     const updated = await updateFolderName(existingFolderId, desiredName);
@@ -661,14 +716,23 @@ async function ensureDriveFolder(payload: RecordPayload, settings: RuntimeSettin
 }
 
 function buildLineMessage(row: ReturnType<typeof mapRow>, settings: RuntimeSettings) {
+  const normalizedType = normalizeProductType(row.type);
+  const shouldIncludeCpuRamStorage = normalizedType !== "printer" && normalizedType !== "monitor";
+  const shouldIncludeDisplay = normalizedType !== "printer";
   let message = `${settings.lineMessageHeader || "แจ้งเตือน: มีการเพิ่มข้อมูลใหม่"}\n`;
   message += `${settings.lineMessageSeparator || "---------------------------"}\n`;
   message += `ประเภท: ${row.type}\n`;
   message += `รุ่น: ${row.brand} ${row.model}\n`;
-  message += `CPU: ${row.cpu}\n`;
-  message += `Ram: ${row.ram}\n`;
-  message += `Storage: ${row.storage}\n`;
-  if (row.display && row.display !== "-") {
+  if (shouldIncludeCpuRamStorage && row.cpu && row.cpu !== "-") {
+    message += `CPU: ${row.cpu}\n`;
+  }
+  if (shouldIncludeCpuRamStorage && row.ram && row.ram !== "-") {
+    message += `Ram: ${row.ram}\n`;
+  }
+  if (shouldIncludeCpuRamStorage && row.storage && row.storage !== "-") {
+    message += `Storage: ${row.storage}\n`;
+  }
+  if (shouldIncludeDisplay && row.display && row.display !== "-") {
     message += `หน้าจอ: ${row.display}\n`;
   }
   if (row.features && row.features !== "-") {
@@ -951,6 +1015,13 @@ async function handleSaveAdminSettings(request: Request) {
     type_options: normalizeStringArray(body?.typeOptions, currentSettings.typeOptions),
     brand_options: normalizeStringArray(body?.brandOptions, currentSettings.brandOptions),
     feature_options: normalizeStringArray(body?.featureOptions, currentSettings.featureOptions),
+    ram_options: normalizeStringArray(body?.ramOptions, currentSettings.ramOptions),
+    storage_options: normalizeStringArray(body?.storageOptions, currentSettings.storageOptions),
+    display_size_options: normalizeStringArray(body?.displaySizeOptions, currentSettings.displaySizeOptions),
+    monitor_brand_options: normalizeStringArray(body?.monitorBrandOptions, currentSettings.monitorBrandOptions),
+    display_tag_options: Array.isArray(body?.displayTagOptions)
+      ? Array.from(new Set(body.displayTagOptions.map((item: unknown) => typeof item === "string" ? item.trim() : "").filter(Boolean)))
+      : currentSettings.displayTagOptions,
     feature_bulk_status_enabled: body?.featureBulkStatusEnabled !== false,
     feature_submit_lock_enabled: body?.featureSubmitLockEnabled !== false,
     feature_dedupe_enabled: body?.featureDedupeEnabled !== false,
@@ -997,8 +1068,9 @@ async function handleCreateOrUpdate(request: Request) {
   const payload = await readRecordPayload(formData);
   const files = formData.getAll("images").filter(entry => entry instanceof File) as File[];
 
-  if (!ensureRequired(payload)) {
-    return jsonResponse({ success: false, message: "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน" }, 400);
+  const missingFields = getMissingRequiredFields(payload);
+  if (missingFields.length > 0) {
+    return jsonResponse({ success: false, message: `กรุณากรอกข้อมูลให้ครบ: ${missingFields.join(", ")}` }, 400);
   }
 
   const isEdit = Boolean(payload.recId);
